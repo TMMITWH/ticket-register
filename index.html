@@ -57,6 +57,9 @@
   .detail{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;padding:4px 16px 14px 78px;border-top:1px dashed var(--line);background:#F6F8FB}
   .dlabel{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut2);margin-bottom:4px}
   .dval{font-size:13px;color:var(--ink2)}
+  .dfull{grid-column:1/-1}
+  textarea.desc{width:100%;min-height:84px;border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:var(--body);resize:vertical;background:#fff}
+  .ticketno{display:inline-block;font-family:var(--mono);font-size:13px;font-weight:700;background:#E3EDFB;color:#1D4F91;border-radius:6px;padding:4px 10px;margin-left:8px;vertical-align:middle}
   .empty{padding:40px;text-align:center;color:var(--mut);font-size:14px}
   .overlay{position:fixed;inset:0;background:rgba(20,26,36,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
   .overlay.show{display:flex}
@@ -88,7 +91,7 @@ window.FIREBASE_CONFIG = {
   projectId: "tmm-ticket-register",
   storageBucket: "tmm-ticket-register.firebasestorage.app",
   messagingSenderId: "262919028644",
-  appId: "1:262919028644:web:d03208c2ab8d70c89d4b31"
+  appId: "1:262919028644:web:d03208c2ab8d70c89d4b31""
 };
 // Optional: set a passcode the team must enter to open the register.
 // Leave "" to disable. Note: this is basic protection only.
@@ -148,9 +151,10 @@ window.APP_PASSCODE = "";
 <!-- New ticket modal -->
 <div class="overlay" id="newOverlay">
   <div class="modal">
-    <h2>New ticket</h2>
+    <h2>New ticket <span class="ticketno" id="nTicketNo">#—</span></h2>
     <div class="grid">
       <label class="full"><div class="flabel">Subject *</div><input type="text" id="nSubject" placeholder="Short description of the issue or request"></label>
+      <label class="full"><div class="flabel">Issue details</div><textarea class="desc" id="nDesc" placeholder="Describe the exact issue: what happened, error message, transaction code, steps to reproduce…"></textarea></label>
       <label><div class="flabel">Created by *</div><input type="text" id="nBy"></label>
       <label><div class="flabel">Contact email</div><input type="email" id="nEmail" placeholder="name@tmm.ae"></label>
       <label><div class="flabel">Department</div><select id="nDept"></select></label>
@@ -211,6 +215,7 @@ let tickets = [];
 let fStatus = "Active", fModule="All", fDept="All", fAssign="All", q="";
 let expanded = null;
 let db = null;
+let editingText = false;
 
 // ---------- config check ----------
 const cfg = window.FIREBASE_CONFIG || {};
@@ -271,7 +276,7 @@ async function boot(){
   onSnapshot(col, (snap)=>{
     tickets = snap.docs.map(d=>d.data()).sort((a,b)=>a.id-b.id);
     setLive(true);
-    render();
+    if(!editingText) render(); // don't wipe a details box someone is typing in
   }, (err)=>{
     setLive(false);
     showError("Live connection lost: "+err.message);
@@ -378,7 +383,7 @@ function render(){
       <div class="rmain" data-expand="${t.id}">
         <div class="c-id">${t.id}</div>
         <div class="c-sub">
-          <div class="subj">${esc(t.subject)||"(no subject)"}</div>
+          <div class="subj">${esc(t.subject)||"(no subject)"}${t.desc?` <span title="Has issue details" style="color:#2E6BC4;font-size:11px">&#9998;</span>`:""}</div>
           <div class="meta">${esc(t.createdBy)}${t.dept?" · "+esc(t.dept):""}${t.created?" · "+esc(t.created):""}</div>
         </div>
         <div class="c-mod"><span class="modtag">${esc(t.module)||"\u2014"}</span></div>
@@ -396,6 +401,8 @@ function render(){
         <div class="c-age ${t.status!=="Closed"&&a>30?"late":""}">${a}d</div>
       </div>
       ${open?`<div class="detail">
+        <div class="dfull"><div class="dlabel">Issue details</div>
+          <textarea class="desc" data-id="${t.id}" data-field="desc" placeholder="No details recorded yet — type the exact issue here and click outside to save.">${esc(t.desc)}</textarea></div>
         <div><div class="dlabel">Contact email</div><div class="dval">${esc(t.email)||"\u2014"}</div></div>
         <div><div class="dlabel">Created date</div><input type="date" value="${esc(t.created)}" data-id="${t.id}" data-field="created"></div>
         <div><div class="dlabel">Closed date</div><input type="date" value="${esc(t.closed)}" ${t.status!=="Closed"?"disabled":""} data-id="${t.id}" data-field="closed"></div>
@@ -425,10 +432,18 @@ function wireUI(){
     const el = e.target;
     if(el.dataset && el.dataset.id && el.dataset.field){
       update(Number(el.dataset.id), {[el.dataset.field]: el.value});
+      if(el.dataset.field==="desc") showToast("Issue details saved for ticket #"+el.dataset.id);
     }
   });
+  // pause live re-render while typing in a details box, resume on blur
+  $("rows").addEventListener("focusin",(e)=>{ if(e.target.tagName==="TEXTAREA") editingText = true; });
+  $("rows").addEventListener("focusout",(e)=>{ if(e.target.tagName==="TEXTAREA"){ editingText = false; render(); } });
 
-  $("btnNew").onclick = ()=>$("newOverlay").classList.add("show");
+  $("btnNew").onclick = ()=>{
+    const nextId = Math.max(0, ...tickets.map(x=>x.id)) + 1;
+    $("nTicketNo").textContent = "#"+nextId;
+    $("newOverlay").classList.add("show");
+  };
   $("btnCancel").onclick = ()=>$("newOverlay").classList.remove("show");
   $("newOverlay").addEventListener("click",(e)=>{ if(e.target===$("newOverlay")) $("newOverlay").classList.remove("show"); });
   $("btnCreate").onclick = ()=>{
@@ -436,16 +451,16 @@ function wireUI(){
     if(!subject || !createdBy){ showToast("Subject and Created by are required"); return; }
     addTicket({
       created: today(), createdBy, dept: $("nDept").value, email: $("nEmail").value.trim(),
-      priority: $("nPriority").value, module: $("nModule").value, subject,
+      priority: $("nPriority").value, module: $("nModule").value, subject, desc: $("nDesc").value.trim(),
       status: "Open", assigned: $("nAssign").value, closed: ""
     });
-    $("nSubject").value=""; $("nBy").value=""; $("nEmail").value="";
+    $("nSubject").value=""; $("nBy").value=""; $("nEmail").value=""; $("nDesc").value="";
   };
 
   $("btnExport").onclick = ()=>{
-    const cols = ["Ticket ID","Created Date","Created By","Department","Contact Email","Priority","SAP Module","Subject","Status","Assigned To","Ticket Aging (Days)","Closed Date"];
+    const cols = ["Ticket ID","Created Date","Created By","Department","Contact Email","Priority","SAP Module","Subject","Issue Details","Status","Assigned To","Ticket Aging (Days)","Closed Date"];
     const escq = v=>`"${String(v??"").replace(/"/g,'""')}"`;
-    const rows = tickets.map(t=>[t.id,t.created,t.createdBy,t.dept,t.email,t.priority,t.module,t.subject,t.status,t.assigned,aging(t),t.closed].map(escq).join(","));
+    const rows = tickets.map(t=>[t.id,t.created,t.createdBy,t.dept,t.email,t.priority,t.module,t.subject,t.desc,t.status,t.assigned,aging(t),t.closed].map(escq).join(","));
     const blob = new Blob([cols.map(escq).join(",")+"\n"+rows.join("\n")],{type:"text/csv"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
