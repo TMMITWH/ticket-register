@@ -74,6 +74,9 @@
   .c-eng{width:140px;font-size:12.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .c-sla{width:80px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:700}
   .pill{display:inline-block;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700}
+  select.pillsel{border:none;border-radius:999px;padding:4px 8px;font-size:11.5px;font-weight:700;width:100%;cursor:pointer}
+  select.inlinesel{border:1px solid transparent;border-radius:6px;padding:4px 4px;font-size:12px;background:transparent;width:100%;cursor:pointer}
+  select.inlinesel:hover{border-color:var(--line2);background:#fff}
   .empty{padding:40px;text-align:center;color:var(--mut);font-size:14px}
   /* detail drawer */
   #detail{position:fixed;top:0;right:-720px;width:min(720px,100%);height:100vh;background:#fff;box-shadow:-12px 0 40px rgba(0,0,0,.18);z-index:40;transition:right .22s ease;display:flex;flex-direction:column}
@@ -544,6 +547,7 @@ function drawRows(){
   const list=filteredTickets();
   const el=$("tRows"); if(!el) return;
   if(!list.length){ el.innerHTML=`<div class="empty">No tickets match. ${isStaff()?"":"You only see tickets you raised."}</div>`; return; }
+  const staff=isStaff(), engs=engineers();
   el.innerHTML=list.map(t=>{
     const s=STC[t.status]||STC.Open;
     const sla=slaLeft(t);
@@ -551,13 +555,30 @@ function drawRows(){
       <div class="c-id">${t.id}</div>
       <div class="c-sub"><div class="subj">${esc(t.subject)||"(no subject)"}${(t.comments&&t.comments.length)?` <span style="color:#2E6BC4;font-size:11px">💬${t.comments.length}</span>`:""}</div>
         <div class="meta">${esc(t.createdBy)} · ${esc(t.dept||"—")} · ${esc(t.created)} · aging ${agingDays(t)}d</div></div>
-      <div class="c-pri" style="color:${PRI_FG[t.priority]||"#374151"}">${esc(t.priority)}</div>
-      <div class="c-st"><span class="pill" style="background:${s.bg};color:${s.fg}">${esc(t.status)}</span></div>
-      ${isStaff()?`<div class="c-eng">${esc(t.engineer||"—")}</div>`:""}
+      <div class="c-pri">${staff
+        ?`<select class="inlinesel" data-qid="${t.id}" data-qf="priority" style="color:${PRI_FG[t.priority]||"#374151"};font-weight:700">${cfg.priorities.map(p=>`<option ${t.priority===p?"selected":""}>${p}</option>`).join("")}</select>`
+        :`<span style="color:${PRI_FG[t.priority]||"#374151"}">${esc(t.priority)}</span>`}</div>
+      <div class="c-st">${staff
+        ?`<select class="pillsel" data-qid="${t.id}" data-qf="status" style="background:${s.bg};color:${s.fg}">${STATUSES.map(x=>`<option ${t.status===x?"selected":""}>${x}</option>`).join("")}</select>`
+        :`<span class="pill" style="background:${s.bg};color:${s.fg}">${esc(t.status)}</span>`}</div>
+      ${staff?`<div class="c-eng"><select class="inlinesel" data-qid="${t.id}" data-qf="engineer"><option value="">Unassigned</option>${engs.map(e=>`<option ${t.engineer===e.name?"selected":""}>${esc(e.name)}</option>`).join("")}</select></div>`:""}
       <div class="c-sla" style="color:${sla==="OVERDUE"?"#B3341C":"#374151"}">${sla}</div>
     </div>`;
   }).join("");
-  el.querySelectorAll("[data-open]").forEach(r=>r.onclick=()=>{openTicketId=Number(r.dataset.open); detailTab="conv"; renderDetail();});
+  // open drawer on row click — but not when using the quick-edit dropdowns
+  el.querySelectorAll("[data-open]").forEach(r=>r.onclick=(e)=>{
+    if(e.target.tagName==="SELECT"||e.target.tagName==="OPTION") return;
+    openTicketId=Number(r.dataset.open); detailTab="conv"; renderDetail();
+  });
+  // quick-edit handlers with the same notifications as the drawer
+  el.querySelectorAll("[data-qid]").forEach(sel=>sel.onchange=(e)=>{
+    const id=Number(sel.dataset.qid), f=sel.dataset.qf, v=e.target.value;
+    const t=tickets.find(x=>x.id===id);
+    if(f==="status") patchTicket(id,{status:v},`Status changed to ${v}`,`Your ticket status is now: ${v}.`);
+    else if(f==="priority") patchTicket(id,{priority:v},`Priority set to ${v}`);
+    else if(f==="engineer") patchTicket(id,{engineer:v, status:(t&&t.status==="Open"&&v)?"In Progress":(t?t.status:"Open")},
+      v?`Assigned to ${v}`:"Unassigned", v?`Your ticket has been assigned to ${v}.`:null);
+  });
 }
 function exportCSV(){
   const cols=["Ticket ID","Created Date","Created By","Department","Contact Email","Priority","Category","Subject","Description","Status","Engineer","Aging (Days)","SLA (h)","Overdue","Closed Date","Resolution"];
@@ -586,10 +607,11 @@ async function patchTicket(id, patch, activityText, notifyRequester){
 
 /* ---------- detail drawer ---------- */
 let attCache={}; // ticketId -> [{id,name,mime,size,data}]
+let editMode=false;
 function renderDetail(){
   const d=$("detail");
   const t=tickets.find(x=>x.id===openTicketId);
-  if(!t){ d.classList.remove("open"); d.innerHTML=""; return; }
+  if(!t){ d.classList.remove("open"); d.innerHTML=""; editMode=false; return; }
   const s=STC[t.status]||STC.Open;
   const staff=isStaff();
   const engs=engineers();
@@ -601,10 +623,26 @@ function renderDetail(){
         <span class="pill" style="background:${s.bg};color:${s.fg};margin-left:8px">${esc(t.status)}</span>
         ${isOverdue(t)?`<span class="pill" style="background:#FEE8E4;color:#B3341C;margin-left:6px">SLA OVERDUE</span>`:""}
       </div>
-      <h2 style="margin-left:6px">${esc(t.subject)}</h2>
+      <h2 style="margin-left:6px">${editMode?`<input id="eSubject" style="width:100%" value="${esc(t.subject)}">`:esc(t.subject)}</h2>
+      ${staff&&!editMode?`<button class="btn sm" id="dEdit" title="Edit ticket details">✎ Edit</button>`:""}
       <button class="btn sm" id="dClose">✕</button>
     </div>
     <div class="dbody">
+      ${editMode?`
+      <div class="panel" style="margin-bottom:14px;background:#FCF6E8;border-color:#EAD9A8">
+        <h3 style="color:#8A5A00">Editing ticket #${t.id}</h3>
+        <div class="grid2">
+          <label class="full"><div class="flabel">Description</div><textarea id="eDesc" style="min-height:100px;width:100%">${esc(t.desc)}</textarea></label>
+          <label><div class="flabel">Requester name</div><input id="eBy" value="${esc(t.createdBy)}"></label>
+          <label><div class="flabel">Requester email</div><input id="eEmail" value="${esc(t.email)}"></label>
+          <label><div class="flabel">Created date</div><input type="date" id="eCreated" value="${esc(t.created)}"></label>
+          <label><div class="flabel">Closed date</div><input type="date" id="eClosed" value="${esc(t.closed)}" ${ACTIVE(t.status)?"disabled":""}></label>
+        </div>
+        <div class="mfoot">
+          <button class="btn sm" id="eCancel">Cancel</button>
+          <button class="btn sm primary" id="eSave">Save changes</button>
+        </div>
+      </div>`:""}
       <div class="dgrid">
         <label><div class="flabel">Status</div>
           <select id="dSt" ${staff?"":"disabled"}>${STATUSES.map(x=>`<option ${t.status===x?"selected":""}>${x}</option>`).join("")}</select></label>
@@ -653,7 +691,22 @@ function renderDetail(){
       </div>
     </div>`;
   d.classList.add("open");
-  $("dClose").onclick=()=>{openTicketId=null; location.hash=""; renderDetail();};
+  $("dClose").onclick=()=>{openTicketId=null; editMode=false; location.hash=""; renderDetail();};
+  if($("dEdit")) $("dEdit").onclick=()=>{editMode=true; renderDetail();};
+  if($("eCancel")) $("eCancel").onclick=()=>{editMode=false; renderDetail();};
+  if($("eSave")) $("eSave").onclick=async ()=>{
+    const patch={
+      subject:$("eSubject").value.trim()||t.subject,
+      desc:$("eDesc").value,
+      createdBy:$("eBy").value.trim(),
+      email:$("eEmail").value.trim(),
+      created:$("eCreated").value||t.created
+    };
+    if(!$("eClosed").disabled) patch.closed=$("eClosed").value;
+    editMode=false;
+    await patchTicket(t.id, patch, "Ticket details edited");
+    toast("Ticket #"+t.id+" updated");
+  };
   d.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{detailTab=b.dataset.tab; renderDetail();});
   if(staff){
     $("dSt").onchange=e=>patchTicket(t.id,{status:e.target.value},`Status changed to ${e.target.value}`,`Your ticket status is now: ${e.target.value}.`);
