@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMM · SAP Support Ticket Register</title>
+<style>
+  :root{
+    --bg:#EEF1F5; --panel:#fff; --line:#E3E7EE; --line2:#D4DAE3;
+    --ink:#1E2530; --ink2:#374151; --mut:#6B7280; --mut2:#8A93A3;
+    --blue:#2E6BC4; --red:#B3341C; --dark:#1E2530;
+    --body:'Segoe UI',system-ui,sans-serif; --mono:Consolas,'SF Mono',monospace; --disp:'Trebuchet MS','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font-family:var(--body);color:var(--ink);padding:20px 20px 60px}
+  .wrap{max-width:1180px;margin:0 auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+  .eyebrow{font-size:11px;letter-spacing:.14em;color:var(--blue);font-weight:700;font-family:var(--mono)}
+  h1{margin:4px 0 0;font-family:var(--disp);font-size:26px;font-weight:700}
+  .hbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .live{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#1F6B36;background:#E4F2E7;border:1px solid #BFE3C8;border-radius:999px;padding:6px 12px}
+  .live.off{color:#8A5A00;background:#FCF1D8;border-color:#EED9A8}
+  .dot{width:8px;height:8px;border-radius:50%;background:#2E8B4A;box-shadow:0 0 0 3px rgba(46,139,74,.25)}
+  .live.off .dot{background:#D99000;box-shadow:0 0 0 3px rgba(217,144,0,.25)}
+  button{font-family:var(--body);cursor:pointer}
+  .btn{background:#fff;color:#3B4453;border:1px solid var(--line2);border-radius:7px;padding:9px 14px;font-size:13.5px;font-weight:600}
+  .btn.primary{background:var(--blue);color:#fff;border:none;font-weight:700;padding:9px 16px}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-width:92px;text-align:left}
+  .stat.active{box-shadow:inset 0 -3px 0 var(--acc)}
+  .slabel{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut2)}
+  .sval{font-family:var(--mono);font-size:22px;font-weight:700}
+  .oldest{margin-left:auto;cursor:default}
+  .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:10px}
+  .filters label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}
+  input[type=text],input[type=date],input[type=email],select{border:1px solid var(--line2);border-radius:6px;padding:7px 10px;font-size:13px;font-family:var(--body);background:#fff;outline:none}
+  #search{flex:1 1 220px;min-width:180px}
+  .count{margin-left:auto;font-size:12px;color:var(--mut);white-space:nowrap}
+  .errorbar{background:#FEE8E4;color:var(--red);padding:8px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;display:none}
+  .table{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .thead{display:flex;gap:10px;align-items:center;padding:10px 16px;background:var(--dark);position:sticky;top:0;z-index:2}
+  .th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#B7C0CE;font-weight:700}
+  .row{border-top:1px solid #EEF1F5}
+  .rmain{display:flex;gap:10px;align-items:center;padding:10px 16px;cursor:pointer}
+  .rmain:hover{background:#FAFBFD}
+  .c-id{width:52px;font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .c-sub{flex:1;min-width:0}
+  .subj{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta{font-size:11.5px;color:var(--mut2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .c-mod{width:70px}.c-pri{width:84px}.c-st{width:128px}.c-as{width:170px}
+  .c-age{width:64px;text-align:right;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink2)}
+  .c-age.late{color:var(--red)}
+  .modtag{font-family:var(--mono);font-size:11px;font-weight:700;background:#EEF1F5;color:#3B4453;padding:3px 7px;border-radius:4px}
+  select.inline{border:1px solid transparent;background:transparent;padding:5px 6px;font-size:12.5px;width:100%}
+  select.inline:hover{border-color:var(--line2)}
+  select.pill{border:none;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;width:100%}
+  .detail{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;padding:4px 16px 14px 78px;border-top:1px dashed var(--line);background:#F6F8FB}
+  .dlabel{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut2);margin-bottom:4px}
+  .dval{font-size:13px;color:var(--ink2)}
+  .empty{padding:40px;text-align:center;color:var(--mut);font-size:14px}
+  .overlay{position:fixed;inset:0;background:rgba(20,26,36,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+  .modal h2{margin:0 0 16px;font-family:var(--disp);font-size:20px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid label{display:block}
+  .grid .full{grid-column:1/-1}
+  .flabel{font-size:12px;color:#5B6472;margin-bottom:4px}
+  .grid input,.grid select{width:100%}
+  .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none}
+  .setup{max-width:640px;margin:60px auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:32px}
+  .setup h2{font-family:var(--disp);margin-top:0}
+  .setup code{background:#EEF1F5;padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12.5px}
+  .setup ol{line-height:1.7;font-size:14px;color:var(--ink2)}
+  @media (max-width:820px){.c-mod,.c-pri{display:none}.c-as{width:130px}.c-st{width:110px}}
+</style>
+</head>
+<body>
+
+<!-- ======================================================================
+     STEP 1 OF SETUP: paste your Firebase config below (see setup guide)
+     ====================================================================== -->
+<script>
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
+  authDomain: "tmm-ticket-register.firebaseapp.com",
+  projectId: "tmm-ticket-register",
+  storageBucket: "tmm-ticket-register.firebasestorage.app",
+  messagingSenderId: "262919028644",
+  appId: "1:262919028644:web:d03208c2ab8d70c89d4b31"
+};
+// Optional: set a passcode the team must enter to open the register.
+// Leave "" to disable. Note: this is basic protection only.
+window.APP_PASSCODE = "";
+</script>
+
+<div id="setupScreen" class="setup" style="display:none">
+  <h2>Almost there — connect Firebase</h2>
+  <p>This page isn't connected to a database yet. Open <code>index.html</code> in a text editor and replace the <code>PASTE_YOUR_…</code> values at the top with your Firebase config, then re-upload the file.</p>
+  <ol>
+    <li>Go to <b>console.firebase.google.com</b> → your project</li>
+    <li>Project settings (gear icon) → <b>Your apps</b> → Web app</li>
+    <li>Copy the <code>firebaseConfig</code> values into this file</li>
+  </ol>
+  <p>Full instructions are in the setup guide provided with this file.</p>
+</div>
+
+<div id="app" class="wrap" style="display:none">
+  <div class="header">
+    <div>
+      <div class="eyebrow">TMM · SAP S/4HANA SUPPORT</div>
+      <h1>IT Support Ticket Register</h1>
+    </div>
+    <div class="hbtns">
+      <div class="live off" id="liveBadge"><span class="dot"></span><span id="liveText">Connecting…</span></div>
+      <button class="btn" id="btnExport">Export CSV</button>
+      <button class="btn primary" id="btnNew">+ New ticket</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="filters">
+    <input type="text" id="search" placeholder="Search subject, requester, email, ID…">
+    <label>Module <select id="fModule"></select></label>
+    <label>Department <select id="fDept"></select></label>
+    <label>Assigned to <select id="fAssign"></select></label>
+    <div class="count" id="count"></div>
+  </div>
+
+  <div class="errorbar" id="errorBar"></div>
+
+  <div class="table">
+    <div class="thead">
+      <div class="th c-id">#</div>
+      <div class="th c-sub">Subject / Requester</div>
+      <div class="th c-mod">Module</div>
+      <div class="th c-pri">Priority</div>
+      <div class="th c-st">Status</div>
+      <div class="th c-as">Assigned to</div>
+      <div class="th c-age">Aging</div>
+    </div>
+    <div id="rows"></div>
+  </div>
+</div>
+
+<!-- New ticket modal -->
+<div class="overlay" id="newOverlay">
+  <div class="modal">
+    <h2>New ticket</h2>
+    <div class="grid">
+      <label class="full"><div class="flabel">Subject *</div><input type="text" id="nSubject" placeholder="Short description of the issue or request"></label>
+      <label><div class="flabel">Created by *</div><input type="text" id="nBy"></label>
+      <label><div class="flabel">Contact email</div><input type="email" id="nEmail" placeholder="name@tmm.ae"></label>
+      <label><div class="flabel">Department</div><select id="nDept"></select></label>
+      <label><div class="flabel">SAP module</div><select id="nModule"></select></label>
+      <label><div class="flabel">Priority</div><select id="nPriority"></select></label>
+      <label><div class="flabel">Assigned to</div><select id="nAssign"></select></label>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="btnCancel">Cancel</button>
+      <button class="btn primary" id="btnCreate">Create ticket</button>
+    </div>
+  </div>
+</div>
+
+<!-- Passcode gate -->
+<div class="overlay" id="gateOverlay">
+  <div class="modal" style="max-width:380px">
+    <h2>Team passcode</h2>
+    <input type="text" id="gateInput" placeholder="Enter passcode" style="width:100%">
+    <div class="mfoot"><button class="btn primary" id="gateBtn">Open register</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SEED_TICKETS = [{"id":1,"created":"2025-09-02","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"TM","subject":"Include the IBD/OBD Number in the Forwarding Order Worklist Report.","status":"Closed","assigned":"Consultant","closed":"2025-09-02"},{"id":2,"created":"","createdBy":"Binoy Idiculla Zachariah","dept":"Operations","email":"binoy@tmm.ae","priority":"Medium","module":"EWM","subject":"FW: OCCUPANCY REPORT","status":"Closed","assigned":"Consultant","closed":""},{"id":3,"created":"","createdBy":"TMM Transport","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"TM","subject":"SAP // Fuel Usage Entry","status":"Closed","assigned":"Consultant","closed":""},{"id":4,"created":"2025-07-12","createdBy":"Vineesh NP","dept":"Documentation","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"RE: CROSS STUFFING REPORTS","status":"On Hold","assigned":"Consultant","closed":""},{"id":5,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Transaction Report-BOE Details not updated","status":"Closed","assigned":"Consultant","closed":""},{"id":6,"created":"","createdBy":"TMM Inventory","dept":"Inventory","email":"inventory@tmm.ae","priority":"Medium","module":"EWM","subject":"FW: Stock Ageing report-Required","status":"Closed","assigned":"Consultant","closed":""},{"id":7,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"RE: update the open points tickets /21082025","status":"Closed","assigned":"Consultant","closed":""},{"id":8,"created":"","createdBy":"TMM Inventory","dept":"Inventory","email":"inventory@tmm.ae","priority":"Medium","module":"EWM","subject":"FW: DN form changes require","status":"Closed","assigned":"Consultant","closed":""},{"id":9,"created":"","createdBy":"TMM Transport","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"SD","subject":"FW: SAP // Customer Name Missing..","status":"Closed","assigned":"Consultant","closed":""},{"id":10,"created":"","createdBy":"Jinoj","dept":"Finance","email":"jinoj@tmm.ae","priority":"Medium","module":"FI","subject":"Suggestion to change customer's Statement","status":"Closed","assigned":"Consultant","closed":""},{"id":11,"created":"","createdBy":"Vineesh NP","dept":"Finance","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Follow-up on Management Cost Booking Discussion","status":"Closed","assigned":"Consultant","closed":""},{"id":12,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"BASIS","subject":"Authorization Request for Vehicle Accident/Maintenance Access- user Prettyv","status":"Closed","assigned":"Consultant","closed":""},{"id":13,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"HU Splitting in RF \u2013 Error","status":"Closed","assigned":"Consultant","closed":""},{"id":14,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"Security","subject":"Support Required \u2013 Timeout Error in Entire Stock Report (T3)","status":"Closed","assigned":"Consultant","closed":""},{"id":15,"created":"","createdBy":"Vineesh NP","dept":"Inventory","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Progress Update \u2013 Warehouse Utilization Report","status":"Closed","assigned":"Consultant","closed":""},{"id":16,"created":"","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"EWM","subject":"Inbound delivery form (ZEWM_IBD_PRINT) barcode issue","status":"Closed","assigned":"Consultant","closed":""},{"id":17,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"FI","subject":"Cost of Sales- Operational cost report (PDF & Excel)","status":"Closed","assigned":"Consultant","closed":""},{"id":18,"created":"","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"EWM","subject":"Update on Long Description Usage","status":"Closed","assigned":"Consultant","closed":""},{"id":19,"created":"","createdBy":"TMM Transport","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"TM","subject":"SAP // VEHICLE METER READING MAINTENANCE","status":"Closed","assigned":"Consultant","closed":""},{"id":20,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"FI","subject":"We need to post the PDC issued cheque on account","status":"Closed","assigned":"Consultant","closed":""},{"id":21,"created":"","createdBy":"NewPrincipal","dept":"IT","email":"newprincipal@tmm.ae","priority":"Medium","module":"SD","subject":"You've joined the NewPrincipal group","status":"Closed","assigned":"Consultant","closed":""},{"id":22,"created":"","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"BASIS","subject":"FW: SAP NEW USER ID REQUEST","status":"Closed","assigned":"Consultant","closed":""},{"id":23,"created":"","createdBy":"Y, Chandan","dept":"IT","email":"chandan.y@nttdata.com","priority":"Medium","module":"EWM","subject":"Re: Restriction on CBM Modification","status":"Closed","assigned":"Consultant","closed":""},{"id":24,"created":"","createdBy":"Prabhath Neomal","dept":"IT","email":"prabhath.n@sybnoc.com","priority":"Medium","module":"","subject":"Re: OCCUPANCY REPORT","status":"Closed","assigned":"Consultant","closed":""},{"id":25,"created":"","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"","subject":"Issue with COO and Vendor Batch Not Reflecting in System After Inbound via RF Device","status":"Closed","assigned":"Consultant","closed":""},{"id":26,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Principal Creation//Universal Islamic Meat FZCO","status":"Closed","assigned":"Consultant","closed":""},{"id":27,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"Provision for Operational cost (Billed FWO) and documentation in P & L report","status":"Closed","assigned":"Consultant","closed":""},{"id":28,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a Principal/MAINSTREAM SHIPPING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":29,"created":"","createdBy":"Jacklin","dept":"IT","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"processing a vendor-to-vendor transaction there is no option available to select the Profit Center","status":"Closed","assigned":"Consultant","closed":""},{"id":30,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal/RAINBOW LUBES AND SUGAR TRADING (FZE)","status":"Closed","assigned":"Consultant","closed":""},{"id":31,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"SAP Connectivity Issue \u2013 Intermittent Downtime and Unstable Network Response","status":"Closed","assigned":"Consultant","closed":""},{"id":32,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal -QUOODO GENERAL TRADING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":33,"created":"","createdBy":"Documentation","dept":"Documentation","email":"doc@tmm.ae","priority":"Medium","module":"","subject":"CONVERSION RATE SHOWING LESS FOR OUTBOUND","status":"Closed","assigned":"Consultant","closed":""},{"id":34,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Correction Required in Detailed Invoice Print \u2013 Zero Value Entries Displayed","status":"Closed","assigned":"Consultant","closed":""},{"id":35,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Unable to access Snapshots.","status":"Closed","assigned":"Consultant","closed":""},{"id":36,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"FW: DRY Storage in JAFZA TMM, TMM Ref:VIP/EVE/10112025/02","status":"Closed","assigned":"Consultant","closed":""},{"id":37,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"RE: Storage and Handling services 24\u00b0C","status":"Closed","assigned":"Consultant","closed":""},{"id":38,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"FW: Inquiry for Storage - Frozen food","status":"Closed","assigned":"Consultant","closed":""},{"id":39,"created":"","createdBy":"Subin Koshy","dept":"Documentation","email":"subin@tmm.ae","priority":"Medium","module":"","subject":"RE: CONVERSION RATE SHOWING LESS FOR OUTBOUND","status":"Closed","assigned":"Consultant","closed":""},{"id":40,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Modification in Open item Statement layout","status":"Closed","assigned":"Consultant","closed":""},{"id":41,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"RE: Provision for Operational cost (Billed FWO) and documentation in P & L report","status":"Closed","assigned":"Consultant","closed":""},{"id":42,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"FW: ARTICLE DETAILS HS/ COO /GW not reflecting in STOCK DATA","status":"Closed","assigned":"Consultant","closed":""},{"id":43,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new User / SAP","status":"Closed","assigned":"Consultant","closed":""},{"id":44,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RHS / Thomsun Logistics - Open Yard Storage (Static cargo)","status":"Closed","assigned":"Consultant","closed":""},{"id":45,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"FUE Usage Details for TMM and Reprotronics","status":"Closed","assigned":"Consultant","closed":""},{"id":46,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"customer balance confirmation and select previous date as on 31.10.2025 , but the system is displaying the current date instead of the selected date","status":"Closed","assigned":"Consultant","closed":""},{"id":47,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"Display PDC received separately in customer balance confirmation","status":"Closed","assigned":"Consultant","closed":""},{"id":48,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Account confirmation statement balance not accurate","status":"Closed","assigned":"Consultant","closed":""},{"id":49,"created":"","createdBy":"ITSM Notification","dept":"IT","email":"itsm.notification-service@sap.com","priority":"Medium","module":"","subject":"FW: THOMSUN MERCANTILE & MARINE (L.L.C) - Maintenance Notification \u2013 Planned Data Center Maintenance UAE-DUBAI-EQUINIX-DX1-B-SAP\u200b || 29th Nov - 30th Nov 2025","status":"Closed","assigned":"Consultant","closed":""},{"id":50,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"New User Creation -Sap","status":"Closed","assigned":"Consultant","closed":""},{"id":51,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal // M O T Shipping & Trading LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":53,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Forwarding cost & revenue report showing duplicate document","status":"Closed","assigned":"Consultant","closed":""},{"id":54,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Respironics Data Appearing Under All User IDs in VA05","status":"Closed","assigned":"Consultant","closed":""},{"id":55,"created":"","createdBy":"Nassar","dept":"Finance","email":"nassar@tmm.ae","priority":"Medium","module":"","subject":"FW: New Principle - BIN ODEH BUILDING CONTRACTING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":56,"created":"","createdBy":"Vishakh Radhakrishnan","dept":"Inventory","email":"vishakh@tmm.ae","priority":"Medium","module":"","subject":"FW: CHICKEN BREAST ( ZENA BRAND )//Expiry date earlier than the production date","status":"Closed","assigned":"Consultant","closed":""},{"id":57,"created":"2025-11-25","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Request to Configure Credit Limit & Credit Days per Plant in SAP S/4HANA","status":"On Hold","assigned":"Consultant","closed":""},{"id":58,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: FUE Usage Details for TMM and Reprotronics","status":"Closed","assigned":"Consultant","closed":""},{"id":59,"created":"","createdBy":"Jijo Ponnachan","dept":"Operations","email":"jijo@tmm.ae","priority":"Medium","module":"","subject":"FW: 3X40 CONTAINERS FOR DE-STUFFING /INSPECTION","status":"Closed","assigned":"Consultant","closed":""},{"id":60,"created":"","createdBy":"Hrithika","dept":"freight","email":"hrithika@tmm.ae","priority":"Medium","module":"","subject":"FWO:2100010295 // FSD: 7100007494 // BILLING DOC: 254107274","status":"Closed","assigned":"Consultant","closed":""},{"id":61,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Remove Cancelled FWO Numbers from WIP Report","status":"Closed","assigned":"Consultant","closed":""},{"id":62,"created":"","createdBy":"Prabhath Neomal","dept":"IT","email":"prabhath.n@sybnoc.com","priority":"Medium","module":"","subject":"Re: Unable to access Snapshots.","status":"Closed","assigned":"Consultant","closed":""},{"id":63,"created":"","createdBy":"Nassar","dept":"Finance","email":"nassar@tmm.ae","priority":"Medium","module":"","subject":"FW: New Principle - M/S.EARTHMECH (FZC)","status":"Closed","assigned":"Consultant","closed":""},{"id":64,"created":"","createdBy":"Rajasekhar","dept":"IT","email":"rajasekhar@aplostech.com","priority":"Medium","module":"","subject":"RE: Reprotonics Data Appearing Under All User IDs in VA05","status":"Closed","assigned":"Consultant","closed":""},{"id":65,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"FW: CDR AND DP DUPLICATE","status":"Closed","assigned":"Consultant","closed":""},{"id":66,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Material Extension Dimension Restriction for Specific Users","status":"Closed","assigned":"Consultant","closed":""},{"id":67,"created":"","createdBy":"Thomas Mani","dept":"Operations","email":"thomasmani@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal//Nelico Cargo & Transportation LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":68,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Access Request \u2013 Job Cost and Revenue Report for User AYAANS","status":"Closed","assigned":"Consultant","closed":""},{"id":69,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"New User Creation Request","status":"Closed","assigned":"Consultant","closed":""},{"id":70,"created":"","createdBy":"Chandan Gowda SY","dept":"IT","email":"chandangowda.sy@aplostech.com","priority":"Medium","module":"","subject":"RE: Confirmation Required for Material Master Creation Uploader Changes","status":"Closed","assigned":"Consultant","closed":""},{"id":71,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"Enter receipt tp vendor a/c(dpa & cdr ) and transfer of invoice and receipt","status":"Closed","assigned":"Consultant","closed":""},{"id":72,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Billing document cancelled","status":"Closed","assigned":"Consultant","closed":""},{"id":73,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"DPA Booking - October month","status":"Closed","assigned":"Consultant","closed":""},{"id":74,"created":"","createdBy":"Geo Paul","dept":"Documentation","email":"geo@tmm.ae","priority":"Medium","module":"","subject":"Fw: /// Trade license and Vat Certificate copy.","status":"Closed","assigned":"Consultant","closed":""},{"id":75,"created":"","createdBy":"Hrithika","dept":"Documentation","email":"hrithika@tmm.ae","priority":"Medium","module":"","subject":"FWO: 2100009829 // BILLING DOC: 254106665","status":"Closed","assigned":"Consultant","closed":""},{"id":76,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create User //Sap","status":"Closed","assigned":"Consultant","closed":""},{"id":77,"created":"","createdBy":"Sam Benjamin","dept":"Operations","email":"sambenjamin@tmm.ae","priority":"Medium","module":"","subject":"FW: MEETING WITH McCORMICK","status":"Closed","assigned":"Consultant","closed":""},{"id":78,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal","status":"Closed","assigned":"Consultant","closed":""},{"id":79,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Statement of account line item error","status":"Closed","assigned":"Consultant","closed":""},{"id":80,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal //ACI LOGISTICS DWC- LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":81,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"SAP Report for DP World & CDR Booking Cost details and corresponding invoice billed details","status":"Closed","assigned":"Consultant","closed":""},{"id":82,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal/Sap","status":"Closed","assigned":"Consultant","closed":""},{"id":83,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Remove Cancelled FWO Numbers from WIP Report- Updated","status":"Closed","assigned":"Consultant","closed":""},{"id":84,"created":"","createdBy":"Manu","dept":"Inventory","email":"manu@tmm.ae","priority":"Medium","module":"","subject":"FW: Increase ASN Number Characteristics//GRN","status":"Closed","assigned":"Consultant","closed":""},{"id":85,"created":"","createdBy":"Prabhath Neomal","dept":"IT","email":"prabhath.n@sybnoc.com","priority":"Medium","module":"","subject":"RE: Issue with COO and Vendor Batch Not Reflecting in System After Inbound via RF Device","status":"Closed","assigned":"Consultant","closed":""},{"id":86,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Issue with Available Quantity Mismatch During Outbound Creation \u2013 Request for Program","status":"Closed","assigned":"Consultant","closed":""},{"id":87,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new Principal/SAP","status":"Closed","assigned":"Consultant","closed":""},{"id":88,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create Principal -MINCOM TRADING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":89,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"VAT RETURN- SEP 2025 to Nov 2025","status":"Closed","assigned":"Consultant","closed":""},{"id":90,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"Change in Opening Balance of Trial Balance","status":"Closed","assigned":"Consultant","closed":""},{"id":91,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Change User Role","status":"Closed","assigned":"Consultant","closed":""},{"id":92,"created":"","createdBy":"Nidheesh P","dept":"Documentation","email":"nidheesh@tmm.ae","priority":"Medium","module":"","subject":"FW: FZ Transit In - HBL DOC25110043 (1x40) INV 1005165615 & 1005165616","status":"Closed","assigned":"Consultant","closed":""},{"id":93,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Request to Transfer Incoming Payment from Cash Sales to MIG (T044)","status":"Closed","assigned":"Consultant","closed":""},{"id":94,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"INV-LGP-For Inspection//Error","status":"Closed","assigned":"Consultant","closed":""},{"id":95,"created":"2025-12-29","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"FI","subject":"We need an option to close the FWO from operation team or finance team (once clicked release to accounting) once the cost booking is completed .","status":"Closed","assigned":"Consultant","closed":""},{"id":96,"created":"2025-12-29","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"FI","subject":"we need another option for getting a summary report a FWO to show its profitability of the FWO.","status":"Closed","assigned":"Consultant","closed":""},{"id":97,"created":"2025-12-29","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"FI","subject":"If i posted it no one can park or post any cost to this FWO, right?","status":"Closed","assigned":"Consultant","closed":""},{"id":98,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: Issue with COO and Vendor Batch Not Reflecting in System After Inbound via RF Device","status":"Closed","assigned":"Consultant","closed":""},{"id":99,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Highlighted Tile need to add in the User","status":"Closed","assigned":"Consultant","closed":""},{"id":100,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New billing Activities // SAP","status":"Closed","assigned":"Consultant","closed":""},{"id":101,"created":"","createdBy":"Customs and Delivery","dept":"Documentation","email":"cd@tmm.ae","priority":"Medium","module":"","subject":"Fw: Runtime Error","status":"Closed","assigned":"Consultant","closed":""},{"id":102,"created":"","createdBy":"TMM Transport","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"","subject":"FW: SAP // MECRC AND BOXCARE BILL","status":"Closed","assigned":"Consultant","closed":""},{"id":103,"created":"","createdBy":"Jinoj","dept":"Finance","email":"jinoj@tmm.ae","priority":"Medium","module":"","subject":"Invoice Details Not Displaying on Voucher","status":"Closed","assigned":"Consultant","closed":""},{"id":105,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create new principal","status":"Closed","assigned":"Consultant","closed":""},{"id":106,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Update Plant Address","status":"Closed","assigned":"Consultant","closed":""},{"id":107,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal","status":"Closed","assigned":"Consultant","closed":""},{"id":108,"created":"","createdBy":"Prabhath Neomal","dept":"IT","email":"prabhath.n@sybnoc.com","priority":"Medium","module":"","subject":"Re: Issue with COO and Vendor Batch Not Reflecting in System After Inbound via RF Device","status":"Closed","assigned":"Consultant","closed":""},{"id":109,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RF Screen \u2013 Vendor Batch Field Character Length Limitation","status":"Closed","assigned":"Consultant","closed":""},{"id":110,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create new Principal/Cleantech Gulf FZCO","status":"Closed","assigned":"Consultant","closed":""},{"id":111,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Principal Creation :A W ROSTAMANI LOGISTICS LLC-GP","status":"Closed","assigned":"Consultant","closed":""},{"id":112,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Cancelled invoice reflecting in Statement of account","status":"Closed","assigned":"Consultant","closed":""},{"id":113,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new User","status":"Closed","assigned":"Consultant","closed":""},{"id":114,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Cancel Vendor 6000994 \u2013 BANBURY SHIPPING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":115,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a User /SAP","status":"Closed","assigned":"Consultant","closed":""},{"id":116,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal//GLOBAL FOOD & DAIRY INGREDIENTS (FZC)","status":"Closed","assigned":"Consultant","closed":""},{"id":117,"created":"","createdBy":"Sibin George","dept":"Inventory","email":"sibin@tmm.ae","priority":"Medium","module":"","subject":"FW: discrepancy observed in the CBM calculation in SAP","status":"Closed","assigned":"Consultant","closed":""},{"id":118,"created":"","createdBy":"Renish","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Canceled invoice showing in statement of account","status":"Closed","assigned":"Consultant","closed":""},{"id":119,"created":"","createdBy":"TMM Inventory","dept":"Inventory","email":"inventory@tmm.ae","priority":"Medium","module":"","subject":"FW: FZ Transit In - HBL SA25110538 (3x40) INV 1005154224 & 1005153213","status":"Closed","assigned":"Consultant","closed":""},{"id":120,"created":"","createdBy":"Binoy Idiculla Zachariah","dept":"Operations","email":"binoy@tmm.ae","priority":"Medium","module":"","subject":"FW: VOLUME UPDATION DISCREPANCY IN OCCUPANCY REPORT","status":"Closed","assigned":"Consultant","closed":""},{"id":121,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"CREATE A NEW PRINCIPAL//SEASHELL SHIPPING SERVICES L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":122,"created":"","createdBy":"Manikandan","dept":"Finance","email":"mani@tmm.ae","priority":"Medium","module":"","subject":"Fw: Unit Volume Change automatically","status":"Closed","assigned":"Consultant","closed":""},{"id":123,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Billing Measurement Not Generating in Test System//need to urgently move the changes in to production","status":"Closed","assigned":"Consultant","closed":""},{"id":124,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"Unable to post the payment voucher for the fiscal year 2026 using the Change Parking Document transaction","status":"Closed","assigned":"Consultant","closed":""},{"id":125,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"Need the option with PDC and without PDC in the vendor balance confirmation","status":"Closed","assigned":"Consultant","closed":""},{"id":126,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal// Maersk Logistics & Services LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":127,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"RE: Need the option with PDC and without PDC in the vendor balance confirmation","status":"Closed","assigned":"Consultant","closed":""},{"id":128,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"Error While Posting Invoice No. 267100627","status":"Closed","assigned":"Consultant","closed":""},{"id":129,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"FW: STORAGE CHARGES IN DIFFERENT LOCATION","status":"Closed","assigned":"Consultant","closed":""},{"id":130,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Incorrect Booking Observed from NTT_FB1 in Job Cost & Revenue Report","status":"Closed","assigned":"Consultant","closed":""},{"id":131,"created":"","createdBy":"Jiju Theophil","dept":"Operations","email":"jiju@tmm.ae","priority":"Medium","module":"","subject":"FW: DN ISSUE","status":"Closed","assigned":"Consultant","closed":""},{"id":132,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal// WADI MALABAR GENERAL TRADING","status":"Closed","assigned":"Consultant","closed":""},{"id":133,"created":"2026-02-24","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"FI","subject":"FW: Sales Man Report","status":"Open","assigned":"Consultant","closed":""},{"id":134,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal//TITAN MULTI MARINE SERVICES L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":135,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New charge Type//Additional Transportation Charges","status":"Closed","assigned":"Consultant","closed":""},{"id":136,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"While cancelling the forwarding settlement, the forwarding order was also cancelled","status":"Closed","assigned":"Consultant","closed":""},{"id":137,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Issue: Forwarding Order Automatically Cancelled While Cancelling Forwarding Settlement","status":"Closed","assigned":"Consultant","closed":""},{"id":138,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Recall: Issue: Forwarding Order Automatically Cancelled While Cancelling Forwarding Settlement","status":"Closed","assigned":"Consultant","closed":""},{"id":139,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Configure Electronic Bank Statement (EBS) for TMML \u2013 NBF & ADCB","status":"Closed","assigned":"Consultant","closed":""},{"id":140,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Update Credit Note Form Header to Tax Credit Note","status":"Closed","assigned":"Consultant","closed":""},{"id":141,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"While posting invoice no. 267101342, the system displays the error message","status":"Closed","assigned":"Consultant","closed":""},{"id":142,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new principal","status":"Closed","assigned":"Consultant","closed":""},{"id":143,"created":"","createdBy":"Manasa V","dept":"IT","email":"manasa.v@aplostech.com","priority":"Medium","module":"","subject":"Request For TR Movement to PRD_TMML","status":"Closed","assigned":"Consultant","closed":""},{"id":144,"created":"","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"","subject":"RE: STORAGE CHARGES IN DIFFERENT LOCATION","status":"Closed","assigned":"Consultant","closed":""},{"id":145,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"Discrepancy in Invoice No. 254105139","status":"Closed","assigned":"Consultant","closed":""},{"id":146,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new Principal//GENTCO L.L.C-FZ","status":"Closed","assigned":"Consultant","closed":""},{"id":147,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New Principal //UNIKAI FOODS P.J.S.C","status":"Closed","assigned":"Consultant","closed":""},{"id":148,"created":"","createdBy":"Sajan Jose","dept":"Finance","email":"sajan@tmm.ae","priority":"Medium","module":"","subject":"Quantity Mismatch in DN","status":"Closed","assigned":"Consultant","closed":""},{"id":149,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Error in Changing Base Unit of Measurement PLT (Pallet) to EA (Each) in the system","status":"Closed","assigned":"Consultant","closed":""},{"id":150,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a Charge type-Sap","status":"Closed","assigned":"Consultant","closed":""},{"id":151,"created":"","createdBy":"Jinoj","dept":"Finance","email":"jinoj@tmm.ae","priority":"Medium","module":"","subject":"RE: Invoice Details Not Displaying on Voucher","status":"Closed","assigned":"Consultant","closed":""},{"id":152,"created":"","createdBy":"Prabhath Neomal","dept":"IT","email":"prabhath.n@sybnoc.com","priority":"Medium","module":"","subject":"RE: Inv generated w/o VAT","status":"Closed","assigned":"Consultant","closed":""},{"id":153,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal //IOR SIGNAUX LLC (LGP stocks).","status":"Closed","assigned":"Consultant","closed":""},{"id":154,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create new Principal//BAB ALTAMAM FOODSTUFF TRADING L.L.C(ARMUK FOODS)","status":"Closed","assigned":"Consultant","closed":""},{"id":155,"created":"2026-02-17","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"TM","subject":"Request to Remove Invoice Reversal Access from CSR Level","status":"Open","assigned":"Consultant","closed":""},{"id":156,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Charge Type Removal & Account Code Update","status":"Closed","assigned":"Consultant","closed":""},{"id":157,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Add the date range in the Wip report","status":"Closed","assigned":"Consultant","closed":""},{"id":158,"created":"2026-02-20","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Request for Technical Configuration Document \u2013 EWM & FI","status":"Open","assigned":"Consultant","closed":""},{"id":159,"created":"","createdBy":"Vineesh NP","dept":"Inventory","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal //NISHAT GENERAL CO (L.L.C)","status":"Closed","assigned":"Consultant","closed":""},{"id":160,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"Give the authorization to open the cancel invoice document","status":"Closed","assigned":"Consultant","closed":""},{"id":162,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"FW: Snapshot Correction.","status":"Closed","assigned":"Consultant","closed":""},{"id":163,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: Reconciliation of Forwarding Order Billing vs P&L","status":"Closed","assigned":"Consultant","closed":""},{"id":164,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Request to Remove Job Posting Permission","status":"Closed","assigned":"Consultant","closed":""},{"id":165,"created":"","createdBy":"Rueban","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"RE: Billing document error","status":"Closed","assigned":"Consultant","closed":""},{"id":166,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new principal //DFC Middle East Ltd. Branch","status":"Closed","assigned":"Consultant","closed":""},{"id":167,"created":"","createdBy":"Jacklin","dept":"Finance","email":"jacklin@tmm.ae","priority":"Medium","module":"","subject":"RE: Discrepancy in Invoice No. 254105139","status":"Closed","assigned":"Consultant","closed":""},{"id":168,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new Principal//Maersk Logistics and Services LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":169,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: Bonded Warehousing Opportunity - White Goods","status":"Closed","assigned":"Consultant","closed":""},{"id":170,"created":"2026-02-24","createdBy":"Renish John","dept":"Finance","email":"renish@tmm.ae","priority":"Medium","module":"FI","subject":"RE: MANAGEMENT COST- SALES MAN REPORT","status":"Closed","assigned":"Consultant","closed":""},{"id":171,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New Principal//Transworld Logistics FZE","status":"Closed","assigned":"Consultant","closed":""},{"id":172,"created":"","createdBy":"Divya V","dept":"Finance","email":"divya@tmm.ae","priority":"Medium","module":"","subject":"RE: Error While Converting FS to PDF","status":"Closed","assigned":"Consultant","closed":""},{"id":173,"created":"","createdBy":"Divya V","dept":"Finance","email":"divya@tmm.ae","priority":"Medium","module":"","subject":"RE: Request for change Storage G/L from 41000270 to 41000280","status":"Closed","assigned":"Consultant","closed":""},{"id":174,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a New principal","status":"Closed","assigned":"Consultant","closed":""},{"id":175,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: Request for Principal Name Change // NUROIL TRADING FZE (T310) to NURAGRO FZE","status":"Closed","assigned":"Consultant","closed":""},{"id":176,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create New principal//CORVETTE SHIPPING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":177,"created":"","createdBy":"Sachin","dept":"Inventory","email":"sachin@tmm.ae","priority":"Medium","module":"","subject":"FW: UNABLE TO CREATE THE OBD","status":"Closed","assigned":"Consultant","closed":""},{"id":178,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create new principal//Hisense Middle East FZE- Zara'a Al","status":"Closed","assigned":"Consultant","closed":""},{"id":179,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: P&L format","status":"Closed","assigned":"Consultant","closed":""},{"id":180,"created":"2026-04-15","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"TM","subject":"Restriction of Posting Access \u2013 Operational Users","status":"Open","assigned":"Consultant","closed":""},{"id":181,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Onboarding-Thomsun Logistics//MOMENTUM LOGISTICS LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":182,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create new Principal//BELLOMASSI FOODSTUFF TRADING L.L.C","status":"Closed","assigned":"Consultant","closed":""},{"id":183,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"RE: Cold Storage Solutions // TMM // Bellomassi Foodstuff Trading LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":184,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create Charge type //Sap","status":"Closed","assigned":"Consultant","closed":""},{"id":185,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create  New principle //DEL MONTE FOODS UAE FZE","status":"Closed","assigned":"Consultant","closed":""},{"id":186,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"FW: SAP  // Fuel Usage Entry  //","status":"Closed","assigned":"Consultant","closed":""},{"id":187,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Urgent: Issue with Forwarding Order Billing \u2013 Immediate Attention Required","status":"Closed","assigned":"Consultant","closed":""},{"id":188,"created":"2026-04-07","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Restriction of Invoice Cancellation in SAP","status":"Open","assigned":"Consultant","closed":""},{"id":189,"created":"2026-02-25","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"RE: Connect for BRS -Training","status":"Open","assigned":"Consultant","closed":""},{"id":190,"created":"2026-04-16","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"RE: Ageing Report in outstanding statement- Wrong Date wise","status":"Closed","assigned":"Consultant","closed":""},{"id":191,"created":"","createdBy":"Rueban","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"","subject":"Request for change of Sales person name","status":"Closed","assigned":"Consultant","closed":""},{"id":192,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Create a new principal //MAERSK A/S","status":"Closed","assigned":"Consultant","closed":""},{"id":193,"created":"","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"","subject":"Material Master creation -Upload Error","status":"Closed","assigned":"Consultant","closed":""},{"id":191,"created":"2026-04-16","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Discrepancy in Inbound CBM \u2013 Automated Billing Issue","status":"Closed","assigned":"Consultant","closed":"2026-04-29"},{"id":192,"created":"2026-04-17","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"EWM","subject":"CBM Calculation Discrepancy","status":"Closed","assigned":"Consultant","closed":"2026-04-29"},{"id":193,"created":"2026-04-24","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Request to Update Bank Account Details in Tax Invoice","status":"Closed","assigned":"Consultant","closed":"2026-04-24"},{"id":194,"created":"2026-04-27","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Missing Snapshot for 18th Date \u2013 All Customers","status":"Closed","assigned":"Consultant","closed":"2026-04-29"},{"id":195,"created":"2026-04-27","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"TM","subject":"SAP  // ERROR - Serial Number is duplicated after SL NO 22","status":"Closed","assigned":"Consultant","closed":""},{"id":196,"created":"2026-04-28","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Create a new principal// AL REHAM TECHNICAL SERVICES(L.L.C)","status":"Closed","assigned":"Consultant","closed":"2026-04-29"},{"id":197,"created":"2026-04-28","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Create Principal//Deal DWC-LLC","status":"Closed","assigned":"Consultant","closed":"2026-04-29"},{"id":198,"created":"2026-04-30","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"QRFC Queue Still Pending After Reset \u2013 Request for Release","status":"Closed","assigned":"Consultant","closed":"2026-05-01"},{"id":199,"created":"2026-05-01","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Posting period Open ( Internal)","status":"Closed","assigned":"IT Team","closed":"2026-05-01"},{"id":200,"created":"2026-05-05","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"SD","subject":"Correction of Employee Name//SAP","status":"Closed","assigned":"Consultant","closed":"2026-05-05"},{"id":201,"created":"2026-05-08","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"RE: Create a new Principal//MM GLOBAL LOGISTICS L.L.C","status":"Closed","assigned":"Consultant","closed":"2026-05-09"},{"id":202,"created":"2026-05-09","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":": Create a New Principal//DUEEFFE AFADO General Trading FZE","status":"Closed","assigned":"Consultant","closed":"2026-05-09"},{"id":203,"created":"2026-05-09","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Discrepancy in Forwarding Settlement Invoice Amount","status":"Closed","assigned":"Consultant","closed":"2026-05-13"},{"id":204,"created":"2026-05-13","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"FI","subject":"FW: Urgent: WIP Correction Required","status":"Closed","assigned":"Consultant","closed":"2026-05-13"},{"id":205,"created":"2026-05-13","createdBy":"Divya V","dept":"Finance","email":"divya@tmm.ae","priority":"Medium","module":"FI","subject":"RE: CDR  FOR THE MONT OF  APRIL  2026","status":"Closed","assigned":"Consultant","closed":"2026-05-13"},{"id":206,"created":"2026-05-16","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"FW: DIC yard.","status":"Closed","assigned":"Consultant","closed":"2026-05-16"},{"id":207,"created":"2026-05-18","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"EWM","subject":"Request to Remove Documentation Principal from Occupancy Report","status":"Closed","assigned":"Consultant","closed":""},{"id":208,"created":"2026-05-19","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"TM","subject":"SAP  // Vehicle Fuel Usage Report Mileage.","status":"Closed","assigned":"Consultant","closed":""},{"id":209,"created":"2026-05-20","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"EWM","subject":"Stock Availability Issue in S4","status":"Closed","assigned":"Consultant","closed":""},{"id":210,"created":"2026-05-23","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"EWM","subject":"Warehouse Activity Showing as Partially Completed","status":"Closed","assigned":"Consultant","closed":""},{"id":211,"created":"2026-05-25","createdBy":"joby","dept":"Documentation","email":"joby@tmm.ae","priority":"Medium","module":"SD","subject":"RE: Invoice cancellation","status":"Closed","assigned":"Consultant","closed":""},{"id":212,"created":"2026-06-05","createdBy":"Sajan Jose","dept":"IT","email":"sajan@tmm.ae","priority":"Medium","module":"FI","subject":"Invoice 267104616 Still Appearing in WIP","status":"Closed","assigned":"Consultant","closed":""},{"id":213,"created":"2026-06-06","createdBy":"George","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"TM","subject":"W: SAP  // REQUSET FOR UPDATE THE SUPPLIER LIST FOR VEHICLE ACCIDENT & MAINTENANCE ENTRY FILE","status":"Closed","assigned":"Consultant","closed":""},{"id":214,"created":"2026-06-06","createdBy":"George","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"TM","subject":"Unable to Select Search Results in Transportation Screen","status":"Closed","assigned":"Consultant","closed":""},{"id":215,"created":"2026-06-16","createdBy":"Ruaben","dept":"Finance","email":"rauben@tmm.ae","priority":"Medium","module":"FI","subject":"RE: Open item Statement error","status":"Closed","assigned":"Consultant","closed":""},{"id":216,"created":"2026-06-25","createdBy":"Geo Paul","dept":"Documentation","email":"geo@tmm.ae","priority":"Medium","module":"TM","subject":"FW: 2100016531/UNABLE TO INVOICE TO DIFFERENT BILLING PARTIES","status":"Closed","assigned":"Consultant","closed":""},{"id":217,"created":"2026-06-25","createdBy":"Jijo","dept":"Operations","email":"jijo@tmm.ae","priority":"Medium","module":"SD","subject":"Create a new Principal//TOLL GLOBAL FORWARDING (UAE) LLC","status":"Closed","assigned":"Consultant","closed":""},{"id":218,"created":"2026-06-25","createdBy":"Jijo","dept":"Operations","email":"jijo@tmm.ae","priority":"Medium","module":"SD","subject":"Create a new principal//Swiss Image International AG","status":"Closed","assigned":"Consultant","closed":""},{"id":219,"created":"2026-06-26","createdBy":"aby","dept":"Inventory","email":"inventory@tmm.ae","priority":"Medium","module":"SD","subject":"Re: NOT ABLE TO CREATE THE NEW MATERIAL","status":"Closed","assigned":"Consultant","closed":""},{"id":220,"created":"2026-07-01","createdBy":"Sajan Jose","dept":"Inventory","email":"it@tmm.ae","priority":"Medium","module":"SD","subject":"RE: Different CBM Values in Outbound Delivery Item","status":"Open","assigned":"Consultant","closed":""},{"id":221,"created":"2026-07-02","createdBy":"George","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"TM","subject":"FW: SAP  // Request for mark the mandatory fields\u2026","status":"Open","assigned":"Consultant","closed":""},{"id":222,"created":"2026-07-02","createdBy":"Divya V","dept":"Finance","email":"divya@tmm.ae","priority":"Medium","module":"FI","subject":"RE: WRONG BALANCE IN PETTY CASH LEDGER FOR DIFFERENT PERIOD ON SAME DATE","status":"Closed","assigned":"FI Consultant (internal)","closed":""},{"id":223,"created":"2026-07-07","createdBy":"George","dept":"Transport","email":"transport@tmm.ae","priority":"Medium","module":"TM","subject":"Request to Add Search and Select Option for Supplier Name in Vehicle/Accident Screen","status":"Open","assigned":"Consultant","closed":""},{"id":224,"created":"2026-07-07","createdBy":"REUBEN","dept":"Finance","email":"accounts@tmm.ae","priority":"Medium","module":"FI","subject":"RE: TRN is not Showing","status":"Closed","assigned":"FI Consultant (internal)","closed":""},{"id":225,"created":"2026-07-09","createdBy":"Vineesh NP","dept":"IT","email":"it@tmm.ae","priority":"Medium","module":"FI","subject":"Request to Implement Cost Booking Approval Process After Billing Completion","status":"Open","assigned":"FI Consultant (internal)","closed":""},{"id":226,"created":"2026-07-11","createdBy":"Jabin","dept":"Inventory","email":"inventory@tmm.ae","priority":"Medium","module":"EWM","subject":"OBD Picking Error \u2013 Request for Assistance","status":"Closed","assigned":"Consultant","closed":""},{"id":227,"created":"2026-07-11","createdBy":"Divya V","dept":"Finance","email":"divya@tmm.ae","priority":"Medium","module":"FI","subject":"FW: Issue with Customer Account Statement Currency","status":"Open","assigned":"FI Consultant (internal)","closed":""}];
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc, getDocs, writeBatch, runTransaction }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const STATUSES = ["Open","In Progress","On Hold","Closed"];
+const ASSIGNEES = ["IT Team","Consultant","FI Consultant (internal)"];
+const PRIORITIES = ["Low","Medium","High","Critical"];
+const MODULES = ["TM","EWM","SD","FI","MM","BASIS","Security","Other"];
+const ST = {
+  "Open":{bg:"#FEE8E4",fg:"#B3341C",dot:"#D9482B"},
+  "In Progress":{bg:"#E3EDFB",fg:"#1D4F91",dot:"#2E6BC4"},
+  "On Hold":{bg:"#FCF1D8",fg:"#8A5A00",dot:"#D99000"},
+  "Closed":{bg:"#E4F2E7",fg:"#1F6B36",dot:"#2E8B4A"}
+};
+const PRI_FG = {Low:"#6B7280",Medium:"#8A5A00",High:"#B3341C",Critical:"#7A1023"};
+
+const $ = (id)=>document.getElementById(id);
+const esc = (s)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today = ()=>new Date().toISOString().slice(0,10);
+const aging = (t)=>{
+  if(!t.created) return 0;
+  const end = (t.status==="Closed" && t.closed) ? new Date(t.closed) : new Date();
+  const d = Math.floor((end - new Date(t.created))/86400000);
+  return d>0?d:0;
+};
+
+let tickets = [];
+let fStatus = "Active", fModule="All", fDept="All", fAssign="All", q="";
+let expanded = null;
+let db = null;
+
+// ---------- config check ----------
+const cfg = window.FIREBASE_CONFIG || {};
+if(!cfg.apiKey || String(cfg.apiKey).includes("PASTE")){
+  $("setupScreen").style.display = "block";
+} else {
+  start();
+}
+
+function start(){
+  // passcode gate
+  if(window.APP_PASSCODE && sessionStorage.getItem("tmm_gate_ok")!=="1"){
+    $("gateOverlay").classList.add("show");
+    const tryGate = ()=>{
+      if($("gateInput").value === window.APP_PASSCODE){
+        sessionStorage.setItem("tmm_gate_ok","1");
+        $("gateOverlay").classList.remove("show");
+        boot();
+      } else { $("gateInput").value=""; $("gateInput").placeholder="Wrong passcode — try again"; }
+    };
+    $("gateBtn").onclick = tryGate;
+    $("gateInput").onkeydown = (e)=>{ if(e.key==="Enter") tryGate(); };
+  } else {
+    boot();
+  }
+}
+
+async function boot(){
+  $("app").style.display = "block";
+  const fbApp = initializeApp(cfg);
+  db = getFirestore(fbApp);
+  const col = collection(db, "tickets");
+
+  // seed once if the collection is empty (guarded by a meta doc)
+  try{
+    const snap = await getDocs(col);
+    if(snap.empty){
+      await runTransaction(db, async (tx)=>{
+        const metaRef = doc(db, "meta", "seeded");
+        const meta = await tx.get(metaRef);
+        if(meta.exists()) return;
+        tx.set(metaRef, {at: new Date().toISOString()});
+      });
+      // batch-write seed data (Firestore batches max 500 ops)
+      let batch = writeBatch(db), n = 0;
+      for(const t of SEED_TICKETS){
+        batch.set(doc(db, "tickets", String(t.id)), t);
+        if(++n === 450){ await batch.commit(); batch = writeBatch(db); n = 0; }
+      }
+      if(n) await batch.commit();
+      showToast("Register initialized with template data");
+    }
+  }catch(e){
+    showError("Could not read the database. Check your Firestore rules and internet connection. ("+e.message+")");
+  }
+
+  // live listener — every teammate's change arrives instantly
+  onSnapshot(col, (snap)=>{
+    tickets = snap.docs.map(d=>d.data()).sort((a,b)=>a.id-b.id);
+    setLive(true);
+    render();
+  }, (err)=>{
+    setLive(false);
+    showError("Live connection lost: "+err.message);
+  });
+
+  wireUI();
+}
+
+function setLive(ok){
+  const b = $("liveBadge");
+  b.classList.toggle("off", !ok);
+  $("liveText").textContent = ok ? "LIVE · synced "+new Date().toLocaleTimeString() : "Offline — reconnecting…";
+}
+function showError(msg){ const e=$("errorBar"); e.textContent=msg; e.style.display="block"; }
+function clearError(){ $("errorBar").style.display="none"; }
+let toastTimer=null;
+function showToast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display="none",2200); }
+
+// ---------- updates ----------
+async function update(id, patch){
+  if(patch.status==="Closed") patch.closed = patch.closed || today();
+  if(patch.status && patch.status!=="Closed") patch.closed = "";
+  try{
+    await updateDoc(doc(db,"tickets",String(id)), patch);
+    clearError();
+    if(patch.status) showToast("Ticket #"+id+" \u2192 "+patch.status);
+  }catch(e){
+    showError("Could not save change to ticket #"+id+": "+e.message);
+  }
+}
+
+async function addTicket(t){
+  const nextId = Math.max(0, ...tickets.map(x=>x.id)) + 1;
+  const rec = {...t, id: nextId};
+  try{
+    await setDoc(doc(db,"tickets",String(nextId)), rec);
+    showToast("Ticket #"+nextId+" created");
+    $("newOverlay").classList.remove("show");
+  }catch(e){
+    showError("Could not create ticket: "+e.message);
+  }
+}
+
+// ---------- rendering ----------
+function options(list, sel){ return list.map(o=>`<option ${o===sel?"selected":""}>${esc(o)}</option>`).join(""); }
+
+function render(){
+  // stats
+  const by = s=>tickets.filter(t=>t.status===s).length;
+  const active = tickets.filter(t=>t.status!=="Closed");
+  const oldest = active.reduce((m,t)=>Math.max(m,aging(t)),0);
+  const stats = [
+    ["Active", active.length, "#B3341C"],
+    ["Open", by("Open"), ST.Open.dot],
+    ["In Progress", by("In Progress"), ST["In Progress"].dot],
+    ["On Hold", by("On Hold"), ST["On Hold"].dot],
+    ["Closed", by("Closed"), ST.Closed.dot],
+    ["All tickets", tickets.length, "#3B4453"],
+  ];
+  $("stats").innerHTML = stats.map(([label,val,acc])=>{
+    const key = label==="All tickets"?"All":label;
+    return `<button class="stat ${fStatus===key?"active":""}" style="--acc:${acc}" data-fstatus="${key}">
+      <div class="slabel">${label}</div><div class="sval" style="color:${acc}">${val}</div></button>`;
+  }).join("") + `<div class="stat oldest"><div class="slabel">Oldest active</div>
+    <div class="sval" style="color:${oldest>30?"#B3341C":"#1E2530"}">${oldest}<span style="font-size:12px;font-weight:500;color:#6B7280"> days</span></div></div>`;
+
+  // filter dropdowns (preserve selection)
+  const depts = [...new Set(tickets.map(t=>t.dept).filter(Boolean))].sort();
+  $("fModule").innerHTML = options(["All",...MODULES,"\u2014"], fModule);
+  $("fDept").innerHTML = options(["All",...depts], fDept);
+  $("fAssign").innerHTML = options(["All",...ASSIGNEES], fAssign);
+  $("nDept").innerHTML = options([...new Set([...depts,"IT"])], "IT");
+  $("nModule").innerHTML = `<option value=""></option>` + options(MODULES, null);
+  $("nPriority").innerHTML = options(PRIORITIES, "Medium");
+  $("nAssign").innerHTML = options(ASSIGNEES, "IT Team");
+
+  // rows
+  const needle = q.trim().toLowerCase();
+  const list = tickets.filter(t=>{
+    if(fStatus==="Active" && t.status==="Closed") return false;
+    if(fStatus!=="All" && fStatus!=="Active" && t.status!==fStatus) return false;
+    if(fModule!=="All" && (t.module||"\u2014")!==fModule) return false;
+    if(fDept!=="All" && t.dept!==fDept) return false;
+    if(fAssign!=="All" && t.assigned!==fAssign) return false;
+    if(needle){
+      const hay = `${t.id} ${t.subject} ${t.createdBy} ${t.email} ${t.module} ${t.dept}`.toLowerCase();
+      if(!hay.includes(needle)) return false;
+    }
+    return true;
+  });
+
+  $("count").textContent = `${list.length} of ${tickets.length} tickets`;
+
+  if(!list.length){
+    $("rows").innerHTML = `<div class="empty">No tickets match these filters. Clear the search or choose different filters.</div>`;
+    return;
+  }
+
+  $("rows").innerHTML = list.map(t=>{
+    const s = ST[t.status]||ST.Open;
+    const a = aging(t);
+    const open = expanded===t.id;
+    return `<div class="row" ${open?'style="background:#F6F8FB"':""}>
+      <div class="rmain" data-expand="${t.id}">
+        <div class="c-id">${t.id}</div>
+        <div class="c-sub">
+          <div class="subj">${esc(t.subject)||"(no subject)"}</div>
+          <div class="meta">${esc(t.createdBy)}${t.dept?" · "+esc(t.dept):""}${t.created?" · "+esc(t.created):""}</div>
+        </div>
+        <div class="c-mod"><span class="modtag">${esc(t.module)||"\u2014"}</span></div>
+        <div class="c-pri" data-stop>
+          <select class="inline" data-id="${t.id}" data-field="priority" style="color:${PRI_FG[t.priority]||"#374151"};font-weight:600">${options(PRIORITIES,t.priority)}</select>
+        </div>
+        <div class="c-st" data-stop>
+          <select class="pill" data-id="${t.id}" data-field="status" style="background:${s.bg};color:${s.fg}">${options(STATUSES,t.status)}</select>
+        </div>
+        <div class="c-as" data-stop>
+          <select class="inline" data-id="${t.id}" data-field="assigned">
+            <option value="" ${!t.assigned?"selected":""}>Unassigned</option>${options(ASSIGNEES,t.assigned)}
+          </select>
+        </div>
+        <div class="c-age ${t.status!=="Closed"&&a>30?"late":""}">${a}d</div>
+      </div>
+      ${open?`<div class="detail">
+        <div><div class="dlabel">Contact email</div><div class="dval">${esc(t.email)||"\u2014"}</div></div>
+        <div><div class="dlabel">Created date</div><input type="date" value="${esc(t.created)}" data-id="${t.id}" data-field="created"></div>
+        <div><div class="dlabel">Closed date</div><input type="date" value="${esc(t.closed)}" ${t.status!=="Closed"?"disabled":""} data-id="${t.id}" data-field="closed"></div>
+        <div><div class="dlabel">SAP module</div><select class="inline" data-id="${t.id}" data-field="module"><option value=""></option>${options(MODULES,t.module)}</select></div>
+      </div>`:""}
+    </div>`;
+  }).join("");
+}
+
+// ---------- events ----------
+function wireUI(){
+  $("stats").addEventListener("click",(e)=>{
+    const b = e.target.closest("[data-fstatus]");
+    if(b){ fStatus = b.dataset.fstatus; render(); }
+  });
+  $("search").addEventListener("input",(e)=>{ q=e.target.value; render(); });
+  $("fModule").addEventListener("change",(e)=>{ fModule=e.target.value; render(); });
+  $("fDept").addEventListener("change",(e)=>{ fDept=e.target.value; render(); });
+  $("fAssign").addEventListener("change",(e)=>{ fAssign=e.target.value; render(); });
+
+  $("rows").addEventListener("click",(e)=>{
+    if(e.target.closest("[data-stop]") || e.target.closest("select") || e.target.closest("input")) return;
+    const r = e.target.closest("[data-expand]");
+    if(r){ const id = Number(r.dataset.expand); expanded = expanded===id?null:id; render(); }
+  });
+  $("rows").addEventListener("change",(e)=>{
+    const el = e.target;
+    if(el.dataset && el.dataset.id && el.dataset.field){
+      update(Number(el.dataset.id), {[el.dataset.field]: el.value});
+    }
+  });
+
+  $("btnNew").onclick = ()=>$("newOverlay").classList.add("show");
+  $("btnCancel").onclick = ()=>$("newOverlay").classList.remove("show");
+  $("newOverlay").addEventListener("click",(e)=>{ if(e.target===$("newOverlay")) $("newOverlay").classList.remove("show"); });
+  $("btnCreate").onclick = ()=>{
+    const subject = $("nSubject").value.trim(), createdBy = $("nBy").value.trim();
+    if(!subject || !createdBy){ showToast("Subject and Created by are required"); return; }
+    addTicket({
+      created: today(), createdBy, dept: $("nDept").value, email: $("nEmail").value.trim(),
+      priority: $("nPriority").value, module: $("nModule").value, subject,
+      status: "Open", assigned: $("nAssign").value, closed: ""
+    });
+    $("nSubject").value=""; $("nBy").value=""; $("nEmail").value="";
+  };
+
+  $("btnExport").onclick = ()=>{
+    const cols = ["Ticket ID","Created Date","Created By","Department","Contact Email","Priority","SAP Module","Subject","Status","Assigned To","Ticket Aging (Days)","Closed Date"];
+    const escq = v=>`"${String(v??"").replace(/"/g,'""')}"`;
+    const rows = tickets.map(t=>[t.id,t.created,t.createdBy,t.dept,t.email,t.priority,t.module,t.subject,t.status,t.assigned,aging(t),t.closed].map(escq).join(","));
+    const blob = new Blob([cols.map(escq).join(",")+"\n"+rows.join("\n")],{type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "SAP_Support_Ticket_Register.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+}
+</script>
+</body>
+</html>
