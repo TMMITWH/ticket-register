@@ -137,19 +137,18 @@
      ============================================================ -->
 <script>
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
+   apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
   authDomain: "tmm-ticket-register.firebaseapp.com",
   projectId: "tmm-ticket-register",
   storageBucket: "tmm-ticket-register.firebasestorage.app",
   messagingSenderId: "262919028644",
   appId: "1:262919028644:web:d03208c2ab8d70c89d4b31"
-
 };
 // Restrict sign-ups to your company domain(s). One or several, comma-separated.
 // Examples:  "tmm.ae"   or   "tmm.ae, tmmgroup.com, partner.ae"   — leave "" to allow any email.
 window.COMPANY_DOMAIN = "tmm.ae, thomsun.ae, sybnoc.com, thomsuninfocare.com";
 // Credit line shown on the login screen and app footer. Leave "" to hide.
-window.DEVELOPER_CREDIT = "Developed by Vineesh- IT Department ";
+window.DEVELOPER_CREDIT = "Developed by Vineesh";
 </script>
 
 <div id="setupScreen" class="setup">
@@ -270,21 +269,30 @@ const engineers = () => users.filter(u=>STAFF_ROLES.includes(u.role));
 /* ---------- SLA ---------- */
 function slaHours(t){ return (cfg.sla&&cfg.sla[t.priority]) || 24; }
 function hoursOpen(t){
-  const start = t.createdAt ? new Date(t.createdAt) : new Date(t.created+"T09:00:00");
-  const end = ACTIVE(t.status) ? new Date() : new Date(t.resolvedAt || t.updated || Date.now());
+  const start = new Date(t.createdAt || (t.created ? t.created+"T09:00:00" : NaN));
+  if(isNaN(start)) return NaN;
+  let end;
+  if(ACTIVE(t.status)) end = new Date();
+  else end = new Date(t.resolvedAt || t.updated || (t.closed ? t.closed+"T17:00:00" : Date.now()));
+  if(isNaN(end)) end = new Date();
   return Math.max(0,(end-start)/3600000);
 }
-function isOverdue(t){ return ACTIVE(t.status) && hoursOpen(t) > slaHours(t); }
+function isOverdue(t){ const h=hoursOpen(t); return ACTIVE(t.status) && isFinite(h) && h > slaHours(t); }
 function slaLeft(t){
   if(!ACTIVE(t.status)) return "—";
-  const left = slaHours(t)-hoursOpen(t);
+  const h = hoursOpen(t);
+  if(!isFinite(h)) return "—";
+  const left = slaHours(t)-h;
   if(left<=0) return "OVERDUE";
   return left>=48 ? Math.round(left/24)+"d" : Math.round(left)+"h";
 }
 function agingDays(t){
   if(!t.created) return 0;
-  const end = ACTIVE(t.status) ? new Date() : new Date(t.closed || t.updated || Date.now());
-  return Math.max(0, Math.floor((end - new Date(t.created))/86400000));
+  const start=new Date(t.created);
+  if(isNaN(start)) return 0;
+  let end = ACTIVE(t.status) ? new Date() : new Date(t.closed || t.updated || Date.now());
+  if(isNaN(end)) end = new Date();
+  return Math.max(0, Math.floor((end - start)/86400000));
 }
 
 /* ---------- mail queue (Apps Script sends these) ---------- */
@@ -840,44 +848,142 @@ $("btnNCreate").onclick=async ()=>{
 };
 
 /* ---------- reports ---------- */
+let RPT={range:"30"}; // 7 | 30 | 90 | 365 | all
+function tCreatedDate(t){ return new Date(t.createdAt || (t.created ? t.created+"T09:00:00" : NaN)); }
+function tClosedDate(t){ return new Date(t.resolvedAt || (t.closed ? t.closed+"T17:00:00" : NaN)); }
 function renderReports(){
-  const now=new Date(), day=86400000;
-  const since=d=>tickets.filter(t=>t.createdAt?new Date(t.createdAt)>=d:new Date(t.created)>=d);
-  const daily=since(new Date(now-1*day)).length, weekly=since(new Date(now-7*day)).length, monthly=since(new Date(now-30*day)).length;
-  const done=tickets.filter(t=>!ACTIVE(t.status));
-  const avgRes=done.length?Math.round(done.reduce((a,t)=>a+hoursOpen(t),0)/done.length):0;
-  const slaOk=done.length?Math.round(done.filter(t=>hoursOpen(t)<=slaHours(t)).length/done.length*100):100;
-  const byEng={}, byDept={};
-  tickets.forEach(t=>{
-    const e=t.engineer||"Unassigned"; byEng[e]=byEng[e]||{total:0,done:0,hrs:0};
-    byEng[e].total++; if(!ACTIVE(t.status)){byEng[e].done++; byEng[e].hrs+=hoursOpen(t);}
-    const dp=t.dept||"—"; byDept[dp]=(byDept[dp]||0)+1;
+  const now=new Date();
+  const cutoff = RPT.range==="all" ? null : new Date(now - Number(RPT.range)*86400000);
+  const inR = d => d instanceof Date && !isNaN(d) && (!cutoff || d>=cutoff);
+  const created = tickets.filter(t=>inR(tCreatedDate(t)));
+  const resolved = tickets.filter(t=>!ACTIVE(t.status) && inR(tClosedDate(t)));
+  const activeNow = tickets.filter(t=>ACTIVE(t.status));
+  const overdueNow = activeNow.filter(isOverdue);
+  const durs = resolved.map(t=>({t,h:hoursOpen(t)})).filter(x=>isFinite(x.h));
+  const avgRes = durs.length?Math.round(durs.reduce((a,x)=>a+x.h,0)/durs.length):0;
+  const slaOk = durs.length?Math.round(durs.filter(x=>x.h<=slaHours(x.t)).length/durs.length*100):100;
+  const highShare = created.length?Math.round(created.filter(t=>t.priority==="High"||t.priority==="Critical").length/created.length*100):0;
+
+  // weekly trend (last 8 weeks): created vs resolved
+  const weeks=[];
+  for(let i=7;i>=0;i--){
+    const start=new Date(now-((i+1)*7)*86400000), end=new Date(now-(i*7)*86400000);
+    weeks.push({
+      label: end.toLocaleDateString(undefined,{day:"2-digit",month:"short"}),
+      c: tickets.filter(t=>{const d=tCreatedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length,
+      r: tickets.filter(t=>{if(ACTIVE(t.status))return false;const d=tClosedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length
+    });
+  }
+  const trendSvg = trendChart(weeks);
+
+  // aging buckets of open backlog
+  const buckets=[["0–1 d",0],["2–3 d",0],["4–7 d",0],["8–30 d",0],["> 30 d",0]];
+  activeNow.forEach(t=>{
+    const a=agingDays(t);
+    if(a<=1)buckets[0][1]++; else if(a<=3)buckets[1][1]++; else if(a<=7)buckets[2][1]++; else if(a<=30)buckets[3][1]++; else buckets[4][1]++;
   });
-  const maxD=Math.max(1,...Object.values(byDept));
+  const maxB=Math.max(1,...buckets.map(b=>b[1]));
+
+  // priority mix (created in range)
+  const priCounts = cfg.priorities.map(p=>[p, created.filter(t=>t.priority===p).length]).filter(x=>x[1]>0);
+
+  // categories & departments (created in range)
+  const catCounts={}, depCounts={}, reqCounts={};
+  created.forEach(t=>{
+    const c=t.category||t.module||"Other"; catCounts[c]=(catCounts[c]||0)+1;
+    const d=t.dept||"—"; depCounts[d]=(depCounts[d]||0)+1;
+    const r=(t.email||t.createdBy||"—").toLowerCase(); reqCounts[r]=(reqCounts[r]||0)+1;
+  });
+  const catArr=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const depArr=Object.entries(depCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const reqArr=Object.entries(reqCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxCat=Math.max(1,...catArr.map(x=>x[1])), maxDep=Math.max(1,...depArr.map(x=>x[1]));
+
+  // engineer table
+  const byEng={};
+  tickets.forEach(t=>{
+    const e=t.engineer||"Unassigned"; byEng[e]=byEng[e]||{open:0,res:0,hrs:0,sla:0};
+    if(ACTIVE(t.status)) byEng[e].open++;
+  });
+  resolved.forEach(t=>{
+    const e=t.engineer||"Unassigned"; byEng[e]=byEng[e]||{open:0,res:0,hrs:0,sla:0};
+    const h=hoursOpen(t); if(isFinite(h)){ byEng[e].res++; byEng[e].hrs+=h; if(h<=slaHours(t)) byEng[e].sla++; }
+  });
+
+  const bar=(label,v,max,color)=>`<div class="barrow"><div class="bl">${esc(label)}</div>
+    <div class="bt"><div class="bf" style="width:${Math.round(v/max*100)}%;background:${color||"#2E6BC4"}"></div></div><div class="bv">${v}</div></div>`;
+
+  const rangeBtn=(v,l)=>`<button class="btn sm" style="${RPT.range===v?"background:#2E6BC4;color:#fff;border-color:#2E6BC4":""}" data-range="${v}">${l}</button>`;
+
   $("view").innerHTML=`
-    <div class="pagetitle" style="display:flex;align-items:center">Reports
-      <button class="btn sm" style="margin-left:auto" id="rCsv">Export CSV</button>
-      <button class="btn sm" id="rPrint" style="margin-left:8px">Print / PDF</button></div>
+    <div class="pagetitle" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Management reports
+      <span style="display:flex;gap:6px;margin-left:auto">
+        ${rangeBtn("7","7 days")}${rangeBtn("30","30 days")}${rangeBtn("90","90 days")}${rangeBtn("365","1 year")}${rangeBtn("all","All time")}
+      </span>
+      <button class="btn sm" id="rCsv">Export CSV</button>
+      <button class="btn sm" id="rPrint">Print / PDF</button>
+    </div>
     <div class="cards">
-      <div class="card static"><div class="cl">Last 24 hours</div><div class="cv">${daily}</div></div>
-      <div class="card static"><div class="cl">Last 7 days</div><div class="cv">${weekly}</div></div>
-      <div class="card static"><div class="cl">Last 30 days</div><div class="cv">${monthly}</div></div>
+      <div class="card static"><div class="cl">Tickets created</div><div class="cv" style="color:#2E6BC4">${created.length}</div></div>
+      <div class="card static"><div class="cl">Tickets resolved</div><div class="cv" style="color:#2E8B4A">${resolved.length}</div></div>
+      <div class="card static"><div class="cl">Open backlog now</div><div class="cv">${activeNow.length}</div></div>
+      <div class="card static"><div class="cl">Overdue now</div><div class="cv" style="color:#B3341C">${overdueNow.length}</div></div>
       <div class="card static"><div class="cl">Avg resolution</div><div class="cv">${avgRes}h</div></div>
       <div class="card static"><div class="cl">SLA compliance</div><div class="cv" style="color:${slaOk>=80?"#2E8B4A":"#B3341C"}">${slaOk}%</div></div>
-      <div class="card static"><div class="cl">Overdue now</div><div class="cv" style="color:#B3341C">${tickets.filter(isOverdue).length}</div></div>
+      <div class="card static"><div class="cl">High/Critical share</div><div class="cv" style="color:${highShare>40?"#B3341C":"#1E2530"}">${highShare}%</div></div>
     </div>
     <div class="panelrow">
-      <div class="panel"><h3>Engineer performance</h3>
-        ${Object.entries(byEng).map(([e,v])=>`<div class="listrow"><span><b>${esc(e)}</b></span>
-          <span style="flex:0 0 auto;font-size:12px;color:var(--mut)">${v.total} tickets · ${v.done} resolved · avg ${v.done?Math.round(v.hrs/v.done):0}h</span></div>`).join("")||"<div class='empty'>No data</div>"}
+      <div class="panel"><h3>Created vs resolved — last 8 weeks</h3>${trendSvg}</div>
+      <div class="panel"><h3>Open backlog by age</h3>
+        ${buckets.map(b=>bar(b[0],b[1],maxB,b[0]==="> 30 d"?"#B3341C":(b[0]==="8–30 d"?"#D99000":"#2E6BC4"))).join("")}
+        <div style="font-size:11px;color:var(--mut);margin-top:8px">Older tickets need attention — red is the risk zone.</div>
       </div>
-      <div class="panel"><h3>Department-wise tickets</h3>
-        ${Object.entries(byDept).sort((a,b)=>b[1]-a[1]).map(([d,v])=>`
-          <div class="barrow"><div class="bl">${esc(d)}</div><div class="bt"><div class="bf" style="width:${Math.round(v/maxD*100)}%"></div></div><div class="bv">${v}</div></div>`).join("")}
+    </div>
+    <div class="panelrow">
+      <div class="panel"><h3>By priority (created in range)</h3>${donut(priCounts.map(([p,v])=>[p,v]).length?priCounts:[["None",1]])}</div>
+      <div class="panel"><h3>By category / SAP module</h3>${catArr.length?catArr.map(([c,v])=>bar(c,v,maxCat)).join(""):`<div class="empty">No data in range</div>`}</div>
+    </div>
+    <div class="panelrow">
+      <div class="panel"><h3>By department</h3>${depArr.length?depArr.map(([d,v])=>bar(d,v,maxDep,"#1E2761")).join(""):`<div class="empty">No data in range</div>`}</div>
+      <div class="panel"><h3>Top requesters (range)</h3>
+        ${reqArr.length?reqArr.map(([r,v])=>`<div class="listrow"><span>${esc(r)}</span><b style="flex:0 0 auto">${v}</b></div>`).join(""):`<div class="empty">No data in range</div>`}
+        <div style="font-size:11px;color:var(--mut);margin-top:8px">Frequent requesters can signal training needs or recurring system issues.</div>
       </div>
+    </div>
+    <div class="panel" style="margin-bottom:16px"><h3>Engineer performance (resolved in range)</h3>
+      <div class="urow" style="grid-template-columns:1fr 110px 110px 120px 110px;font-weight:700;color:var(--mut);font-size:11px;text-transform:uppercase">
+        <span>Engineer</span><span>Open now</span><span>Resolved</span><span>Avg resolution</span><span>SLA met</span></div>
+      ${Object.entries(byEng).sort((a,b)=>b[1].res-a[1].res).map(([e,v])=>`
+        <div class="urow" style="grid-template-columns:1fr 110px 110px 120px 110px">
+          <b>${esc(e)}</b><span>${v.open}</span><span>${v.res}</span>
+          <span>${v.res?Math.round(v.hrs/v.res)+"h":"—"}</span>
+          <span style="color:${v.res&&v.sla/v.res>=0.8?"#2E8B4A":"#B3341C"}">${v.res?Math.round(v.sla/v.res*100)+"%":"—"}</span>
+        </div>`).join("")}
     </div>`;
+  $("view").querySelectorAll("[data-range]").forEach(b=>b.onclick=()=>{RPT.range=b.dataset.range; renderReports();});
   $("rCsv").onclick=exportCSV;
   $("rPrint").onclick=()=>window.print();
+}
+function trendChart(weeks){
+  const W=520,H=190,pad=26,bw=18;
+  const max=Math.max(1,...weeks.map(w=>Math.max(w.c,w.r)));
+  const gw=(W-pad*2)/weeks.length;
+  let bars="",labels="";
+  weeks.forEach((w,i)=>{
+    const x=pad+i*gw+gw/2;
+    const hc=(w.c/max)*(H-60), hr=(w.r/max)*(H-60);
+    bars+=`<rect x="${x-bw-1}" y="${H-30-hc}" width="${bw}" height="${hc}" rx="3" fill="#2E6BC4"></rect>`;
+    bars+=`<rect x="${x+1}" y="${H-30-hr}" width="${bw}" height="${hr}" rx="3" fill="#2E8B4A"></rect>`;
+    if(w.c) bars+=`<text x="${x-bw/2}" y="${H-34-hc}" text-anchor="middle" font-size="9" fill="#5B6472">${w.c}</text>`;
+    if(w.r) bars+=`<text x="${x+bw/2+1}" y="${H-34-hr}" text-anchor="middle" font-size="9" fill="#5B6472">${w.r}</text>`;
+    labels+=`<text x="${x}" y="${H-14}" text-anchor="middle" font-size="9" fill="#8A93A3">${w.label}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:560px">
+    <line x1="${pad}" y1="${H-30}" x2="${W-pad}" y2="${H-30}" stroke="#E3E7EE"></line>
+    ${bars}${labels}
+    <rect x="${pad}" y="4" width="10" height="10" rx="2" fill="#2E6BC4"></rect><text x="${pad+15}" y="13" font-size="10" fill="#5B6472">Created</text>
+    <rect x="${pad+75}" y="4" width="10" height="10" rx="2" fill="#2E8B4A"></rect><text x="${pad+90}" y="13" font-size="10" fill="#5B6472">Resolved</text>
+  </svg>`;
 }
 
 /* ---------- admin ---------- */
