@@ -144,8 +144,9 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "262919028644",
   appId: "1:262919028644:web:d03208c2ab8d70c89d4b31"
 };
-// Optional: restrict sign-ups to your company domain, e.g. "tmm.ae". Leave "" to allow any email.
-window.COMPANY_DOMAIN = "";
+// Restrict sign-ups to your company domain(s). One or several, comma-separated.
+// Examples:  "tmm.ae"   or   "tmm.ae, tmmgroup.com, partner.ae"   — leave "" to allow any email.
+window.COMPANY_DOMAIN = "tmm.ae, thomsun.ae, sybnoc.com, thomsuninfocare.com";
 </script>
 
 <div id="setupScreen" class="setup">
@@ -345,8 +346,12 @@ function wireAuthUI(){
     err("");
     const em=$("aEmail").value.trim(), pw=$("aPass").value;
     if(!em||!pw) return err("Email and password are required.");
-    if(window.COMPANY_DOMAIN && signupMode && !em.toLowerCase().endsWith("@"+window.COMPANY_DOMAIN.toLowerCase()))
-      return err("Sign-ups are restricted to @"+window.COMPANY_DOMAIN+" emails.");
+    if(signupMode && window.COMPANY_DOMAIN){
+      const allowed = String(window.COMPANY_DOMAIN).split(",").map(d=>d.trim().toLowerCase().replace(/^@/,"")).filter(Boolean);
+      const dom = em.toLowerCase().split("@")[1]||"";
+      if(allowed.length && !allowed.includes(dom))
+        return err("Sign-ups are restricted to company emails: "+allowed.map(d=>"@"+d).join(", "));
+    }
     $("authBtn").disabled=true;
     try{
       if(signupMode){
