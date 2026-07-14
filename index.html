@@ -231,7 +231,7 @@ const STC = {
 };
 const PRI_FG = {Low:"#6B7280",Medium:"#8A5A00",High:"#B3341C",Critical:"#7A1023"};
 const DEFAULT_CFG = {
-  departments:["IT","Operations","Transport","Documentation","Inventory","Finance","Freight"],
+  departments:["IT","HR","Operations","Transport","Documentation","Inventory","Finance","Freight"],
   categories:["TM","EWM","SD","FI","MM","BASIS","Security","Hardware","Network","Access Request","Other"],
   priorities:["Low","Medium","High","Critical"],
   sla:{Low:72,Medium:24,High:8,Critical:4}
@@ -324,6 +324,14 @@ function showAuth(){
 let signupMode=false;
 function wireAuthUI(){
   $("aDept").innerHTML = DEFAULT_CFG.departments.map(d=>`<option>${esc(d)}</option>`).join("");
+  // If settings are publicly readable, show the live department list managed in Admin
+  (async ()=>{
+    try{
+      const snap = await getDoc(doc(db,"settings","config"));
+      if(snap.exists() && Array.isArray(snap.data().departments) && snap.data().departments.length)
+        $("aDept").innerHTML = snap.data().departments.map(d=>`<option>${esc(d)}</option>`).join("");
+    }catch(e){ /* rules require login to read settings — defaults are used */ }
+  })();
   const err = m => { const e=$("authErr"); if(!m){e.style.display="none";return;} e.textContent=m; e.style.display="block"; };
   $("lnkMode").onclick = ()=>{
     signupMode=!signupMode; err("");
