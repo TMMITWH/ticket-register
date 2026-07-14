@@ -137,16 +137,19 @@
      ============================================================ -->
 <script>
 window.FIREBASE_CONFIG = {
-   apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
+  apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
   authDomain: "tmm-ticket-register.firebaseapp.com",
   projectId: "tmm-ticket-register",
   storageBucket: "tmm-ticket-register.firebasestorage.app",
   messagingSenderId: "262919028644",
   appId: "1:262919028644:web:d03208c2ab8d70c89d4b31"
+
 };
 // Restrict sign-ups to your company domain(s). One or several, comma-separated.
 // Examples:  "tmm.ae"   or   "tmm.ae, tmmgroup.com, partner.ae"   — leave "" to allow any email.
 window.COMPANY_DOMAIN = "tmm.ae, thomsun.ae, sybnoc.com, thomsuninfocare.com";
+// Credit line shown on the login screen and app footer. Leave "" to hide.
+window.DEVELOPER_CREDIT = "Developed by Vineesh- IT Department ";
 </script>
 
 <div id="setupScreen" class="setup">
@@ -169,6 +172,7 @@ window.COMPANY_DOMAIN = "tmm.ae, thomsun.ae, sybnoc.com, thomsuninfocare.com";
       <a id="lnkMode">Create an account</a>
       <a id="lnkReset">Forgot password?</a>
     </div>
+    <div id="creditAuth" style="margin-top:18px;text-align:center;font-size:10.5px;color:#8A93A3"></div>
   </div>
 </div>
 
@@ -181,6 +185,7 @@ window.COMPANY_DOMAIN = "tmm.ae, thomsun.ae, sybnoc.com, thomsuninfocare.com";
     <button class="btn sm" id="btnLogout" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25)">Logout</button>
   </div>
   <div class="main" id="view"></div>
+  <div id="creditApp" style="max-width:1240px;margin:0 auto;padding:6px 20px 22px;font-size:10.5px;color:#8A93A3;text-align:right"></div>
 </div>
 
 <!-- New ticket modal -->
@@ -291,6 +296,8 @@ function trackFooter(id){ return "\n\nTrack your ticket: " + location.origin + l
 
 /* ---------- boot ---------- */
 const CFGV = window.FIREBASE_CONFIG||{};
+const CREDIT = String(window.DEVELOPER_CREDIT||"").trim();
+if(CREDIT){ $("creditAuth").textContent = CREDIT; $("creditApp").textContent = CREDIT; }
 if(!CFGV.apiKey || String(CFGV.apiKey).includes("PASTE")){
   $("setupScreen").style.display="block";
 }else{
