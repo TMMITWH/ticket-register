@@ -137,7 +137,7 @@
      ============================================================ -->
 <script>
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
+   apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
   authDomain: "tmm-ticket-register.firebaseapp.com",
   projectId: "tmm-ticket-register",
   storageBucket: "tmm-ticket-register.firebasestorage.app",
@@ -625,6 +625,7 @@ function renderDetail(){
       </div>
       <h2 style="margin-left:6px">${editMode?`<input id="eSubject" style="width:100%" value="${esc(t.subject)}">`:esc(t.subject)}</h2>
       ${staff&&!editMode?`<button class="btn sm" id="dEdit" title="Edit ticket details">✎ Edit</button>`:""}
+      ${isAdmin()&&!editMode?`<button class="btn sm danger" id="dDelete" title="Delete this ticket permanently">🗑</button>`:""}
       <button class="btn sm" id="dClose">✕</button>
     </div>
     <div class="dbody">
@@ -693,6 +694,18 @@ function renderDetail(){
   d.classList.add("open");
   $("dClose").onclick=()=>{openTicketId=null; editMode=false; location.hash=""; renderDetail();};
   if($("dEdit")) $("dEdit").onclick=()=>{editMode=true; renderDetail();};
+  if($("dDelete")) $("dDelete").onclick=async ()=>{
+    if(!confirm("Delete ticket #"+t.id+" permanently?\n\nThis cannot be undone. Use only for test or junk tickets — real tickets should be Closed, not deleted.")) return;
+    if(prompt("Type the ticket number to confirm deletion:")!==String(t.id)){ toast("Deletion cancelled"); return; }
+    try{
+      const { getDocs, query, where, collection: coll } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      const snap = await getDocs(query(coll(db,"attachments"), where("ticketId","==",t.id)));
+      for(const a of snap.docs) await deleteDoc(doc(db,"attachments",a.id));
+      await deleteDoc(doc(db,"tickets",String(t.id)));
+      openTicketId=null; renderDetail();
+      toast("Ticket #"+t.id+" deleted");
+    }catch(e){ toast("Delete failed: "+e.message); }
+  };
   if($("eCancel")) $("eCancel").onclick=()=>{editMode=false; renderDetail();};
   if($("eSave")) $("eSave").onclick=async ()=>{
     const patch={
