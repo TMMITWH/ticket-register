@@ -137,7 +137,7 @@
      ============================================================ -->
 <script>
 window.FIREBASE_CONFIG = {
-     apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
+  apiKey: "AIzaSyCJOZuPx3Q42HKp5_OHrK0LkLEslOIrhpA",
   authDomain: "tmm-ticket-register.firebaseapp.com",
   projectId: "tmm-ticket-register",
   storageBucket: "tmm-ticket-register.firebasestorage.app",
@@ -196,6 +196,7 @@ window.DEVELOPER_CREDIT = "Developed by Vineesh";
       <label class="full"><div class="flabel">Description — describe the exact issue *</div><textarea id="nDesc" style="min-height:90px" placeholder="What happened, error message, transaction code, steps…"></textarea></label>
       <label><div class="flabel">Department</div><select id="nDept"></select></label>
       <label><div class="flabel">Category</div><select id="nCategory"></select></label>
+      <div class="full" id="nApprovalInfo" style="display:none;grid-column:1/-1;background:#FCF1D8;border:1px solid #EAD9A8;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#8A5A00"></div>
       <label><div class="flabel">Priority</div><select id="nPriority"></select></label>
       <label><div class="flabel">Attachment (screenshot / PDF / log, max 700 KB)</div><input type="file" id="nFile"></label>
       <label id="nReqRow" class="full" style="display:none"><div class="flabel">Requester email (staff only — creating on behalf of a user)</div><input type="email" id="nReqEmail" placeholder="leave empty = yourself"></label>
@@ -236,11 +237,21 @@ const STC = {
 const PRI_FG = {Low:"#6B7280",Medium:"#8A5A00",High:"#B3341C",Critical:"#7A1023"};
 const DEFAULT_CFG = {
   departments:["IT","HR","Operations","Transport","Documentation","Inventory","Finance","Freight"],
-  categories:["TM","EWM","SD","FI","MM","BASIS","Security","Hardware","Network","Access Request","CBM Change","Billing","Cost Adjustment","Other"],
+  categories:["TM","EWM","SD","FI","MM","BASIS","Security","Hardware","Network","Access Request",
+              "CBM Change","Billing","Cost Adjustment","Pick Cancel","Vendor Batch Update",
+              "Invoice Change","Cost Change","Credit Note","Other"],
   priorities:["Low","Medium","High","Critical"],
   sla:{Low:72,Medium:24,High:8,Critical:4},
-  approvalCategories:["CBM Change","Billing","Cost Adjustment"],
-  approvers:[]
+  approvalGroups:{
+    "Operation Managers":["binoy@tmm.ae","sambenjamin@tmm.ae"],
+    "GM":["jubi@tmm.ae"]
+  },
+  approvalRouting:{
+    "CBM Change":"Operation Managers","Billing":"Operation Managers","Cost Adjustment":"Operation Managers",
+    "Pick Cancel":"Operation Managers","Vendor Batch Update":"Operation Managers",
+    "Invoice Change":"GM","Cost Change":"GM","Credit Note":"GM"
+  },
+  approverLabels:{"binoy@tmm.ae":"Binoy","sambenjamin@tmm.ae":"Sam Benjamin","jubi@tmm.ae":"Jubi Mathai"}
 };
 const STAFF_ROLES = ["IT Support","Consultant","Admin"];
 
@@ -265,8 +276,19 @@ let unsubs=[];
 const isStaff = () => me && STAFF_ROLES.includes(me.role);
 const isAdmin = () => me && me.role==="Admin";
 const canManage = () => me && (me.role==="Consultant"||me.role==="Admin");
-const isApprover = () => me && (isAdmin() || (cfg.approvers||[]).map(e=>String(e).toLowerCase()).includes(me.email.toLowerCase()));
-const needsApproval = cat => (cfg.approvalCategories||[]).includes(cat);
+const routingGroup = cat => (cfg.approvalRouting||{})[cat] || "";
+const needsApproval = cat => !!routingGroup(cat);
+const groupApprovers = g => ((cfg.approvalGroups||{})[g]||[]).map(e=>String(e).toLowerCase());
+const isApprover = () => me && (isAdmin() || Object.values(cfg.approvalGroups||{}).flat().map(e=>String(e).toLowerCase()).includes(me.email.toLowerCase()));
+const canApprove = t => me && (isAdmin() || groupApprovers(t.approvalGroup||routingGroup(t.category||t.module)).includes(me.email.toLowerCase()));
+const myGroups = () => me ? Object.entries(cfg.approvalGroups||{}).filter(([g,list])=>list.map(e=>String(e).toLowerCase()).includes(me.email.toLowerCase())).map(([g])=>g) : [];
+function approverLabel(email){
+  const lbl = (cfg.approverLabels||{})[String(email).toLowerCase()] || (cfg.approverLabels||{})[email];
+  if(lbl) return lbl;
+  const u = users.find(x=>x.email.toLowerCase()===String(email).toLowerCase());
+  return u ? u.name : email;
+}
+function approverNames(group){ return ((cfg.approvalGroups||{})[group]||[]).map(approverLabel).join(", "); }
 const myTickets = () => isStaff() ? tickets : tickets.filter(t => (t.email||"").toLowerCase()===me.email.toLowerCase() || t.createdByUid===me.uid);
 const engineers = () => users.filter(u=>STAFF_ROLES.includes(u.role));
 
@@ -434,7 +456,16 @@ function startApp(){
     }, ()=>{}));
   }
   unsubs.push(onSnapshot(doc(db,"settings","config"), s=>{
-    if(s.exists()) cfg = Object.assign({}, DEFAULT_CFG, s.data());
+    if(s.exists()){
+      cfg = Object.assign({}, DEFAULT_CFG, s.data());
+      // migrate legacy single-list approvers (pre-groups version)
+      if(!s.data().approvalGroups && Array.isArray(s.data().approvers) && s.data().approvers.length){
+        cfg.approvalGroups = Object.assign({}, DEFAULT_CFG.approvalGroups);
+        cfg.approvalGroups["Operation Managers"] = [...new Set([...cfg.approvalGroups["Operation Managers"], ...s.data().approvers])];
+      }
+      // every routed category must exist in the selectable category list
+      cfg.categories = [...new Set([...(cfg.categories||[]), ...Object.keys(cfg.approvalRouting||{})])];
+    }
     render();
   }, ()=>{}));
 
@@ -448,7 +479,8 @@ function startApp(){
 function navItems(){
   const items=[["dashboard","Dashboard"],["tickets","Tickets"]];
   if(isApprover()){
-    const n=tickets.filter(t=>t.approval==="Pending").length;
+    const gs=myGroups();
+    const n=tickets.filter(t=>t.approval==="Pending" && (isAdmin()||gs.includes(t.approvalGroup))).length;
     items.push(["approvals","Approvals"+(n?` (${n})`:"")]);
   }
   if(isStaff()) items.push(["reports","Reports"]);
@@ -719,15 +751,18 @@ function renderDetail(){
           background:${t.approval==="Pending"?"#FCF1D8":t.approval==="Approved"?"#E4F2E7":"#FEE8E4"};
           border:1px solid ${t.approval==="Pending"?"#EAD9A8":t.approval==="Approved"?"#BFE3C8":"#F3C4BA"};
           color:${t.approval==="Pending"?"#8A5A00":t.approval==="Approved"?"#1F6B36":"#B3341C"}">
-          <b>${t.approval==="Pending"?"⏳ Awaiting Operation Manager approval":t.approval==="Approved"?"✔ Approved":"✕ Rejected"}</b>
+          <b>${t.approval==="Pending"?`⏳ Awaiting ${esc(t.approvalGroup||"manager")} approval`:t.approval==="Approved"?"✔ Approved":"✕ Rejected"}</b>
+          ${t.approval==="Pending"&&approverNames(t.approvalGroup)?` — pending with: ${esc(approverNames(t.approvalGroup))}`:""}
           ${t.approvalBy?` — by ${esc(t.approvalBy)} ${t.approvalAt?fmtDT(t.approvalAt):""}`:""}
           ${t.approvalNote?`<div style="margin-top:4px">Note: ${esc(t.approvalNote)}</div>`:""}
           ${t.approval==="Pending"?`<div style="margin-top:4px;font-weight:400">This ticket cannot be Resolved or Closed until approved.</div>`:""}
-          ${t.approval==="Pending"&&isApprover()?`<div style="margin-top:8px">
+          ${t.approval==="Pending"&&canApprove(t)?`<div style="margin-top:8px">
             <button class="btn sm" id="apYes" style="background:#2E8B4A;color:#fff;border:none">✔ Approve</button>
             <button class="btn sm danger" id="apNo">✕ Reject</button></div>`:""}
         </div>`:""}
-      ${staff&&!t.approval&&ACTIVE(t.status)?`<div style="margin-bottom:12px"><button class="btn sm" id="apReq">⏳ Request manager approval</button></div>`:""}
+      ${staff&&!t.approval&&ACTIVE(t.status)?`<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+        <select id="apReqGroup" style="font-size:12px">${Object.keys(cfg.approvalGroups||{}).map(g=>`<option ${routingGroup(t.category||t.module)===g?"selected":""}>${esc(g)}</option>`).join("")}</select>
+        <button class="btn sm" id="apReq">⏳ Request approval</button></div>`:""}
       <div class="descbox">${esc(t.desc)||"No description recorded."}</div>
       <div id="dAtts" style="margin-bottom:12px"></div>
       ${canManage()&&ACTIVE(t.status)?`<div style="margin-bottom:12px">
@@ -818,7 +853,7 @@ function renderDetail(){
     if(t.approval==="Pending"){ toast("Needs manager approval before closing"); return; }
     patchTicket(t.id,{status:"Closed"},"Ticket closed","Your ticket is now CLOSED. Thank you.");
   };
-  if($("apReq")) $("apReq").onclick=()=>requestApproval(t);
+  if($("apReq")) $("apReq").onclick=()=>requestApproval(t, $("apReqGroup").value);
   if($("apYes")) $("apYes").onclick=()=>decideApproval(t,"Approved");
   if($("apNo")) $("apNo").onclick=()=>decideApproval(t,"Rejected");
   $("rSend").onclick=async ()=>{
@@ -868,37 +903,41 @@ async function saveAttachment(ticketId, file){
   }catch(e){ toast("Attachment failed: "+e.message); return false; }
 }
 
-/* ---------- approval workflow ---------- */
-async function requestApproval(t){
-  await patchTicket(t.id,{approval:"Pending",approvalBy:"",approvalAt:"",approvalNote:""},"Manager approval requested");
-  notifyApprovers(t);
-  toast("Approval requested for ticket #"+t.id);
+/* ---------- approval workflow (routed groups) ---------- */
+async function requestApproval(t, group){
+  await patchTicket(t.id,{approval:"Pending",approvalGroup:group,approvalBy:"",approvalAt:"",approvalNote:""},`${group} approval requested`);
+  notifyApprovers({...t, approvalGroup:group});
+  toast("Approval requested from "+group);
 }
 function notifyApprovers(t){
-  (cfg.approvers||[]).forEach(a=>queueMail(a, `Approval required — Ticket #${t.id}`,
-`Dear Operation Manager,\n\nTicket #${t.id} requires your approval before IT can proceed.\n\nSubject: ${t.subject}\nCategory: ${t.category||t.module||"—"}\nRequester: ${t.createdBy} <${t.email}>\nPriority: ${t.priority}\n\nPlease log in to the helpdesk, open the Approvals tab, and Approve or Reject.${trackFooter(t.id)}`));
+  const g = t.approvalGroup || routingGroup(t.category||t.module);
+  ((cfg.approvalGroups||{})[g]||[]).forEach(a=>queueMail(a, `Approval required — Ticket #${t.id}`,
+`Dear ${approverLabel(a)},\n\nTicket #${t.id} requires ${g} approval before IT can proceed.\n\nSubject: ${t.subject}\nCategory: ${t.category||t.module||"—"}\nRequester: ${t.createdBy} <${t.email}>\nPriority: ${t.priority}\n\nPlease log in to the helpdesk, open the Approvals tab, and Approve or Reject.${trackFooter(t.id)}`));
 }
 async function decideApproval(t,decision){
   const note = prompt(decision==="Approved" ? "Optional note for the approval:" : "Reason for rejection (recommended):") || "";
   await patchTicket(t.id,{approval:decision, approvalBy:me.name, approvalAt:nowIso(), approvalNote:note,
       status: decision==="Rejected" ? "On Hold" : t.status},
-    `${decision} by ${me.name}${note?": "+note:""}`,
-    decision==="Approved" ? "Your request has been APPROVED by the Operation Manager. IT will proceed with the change."
-                          : "Your request was NOT approved by the Operation Manager."+(note?" Reason: "+note:""));
+    `${decision} by ${me.name} (${t.approvalGroup||"approval"})${note?": "+note:""}`,
+    decision==="Approved" ? `Your request has been APPROVED by ${me.name}. IT will proceed with the change.`
+                          : `Your request was NOT approved by ${me.name}.`+(note?" Reason: "+note:""));
   toast("Ticket #"+t.id+" "+decision.toLowerCase());
 }
 function renderApprovals(){
-  const pend = tickets.filter(t=>t.approval==="Pending");
-  const decided = tickets.filter(t=>t.approval==="Approved"||t.approval==="Rejected").slice(0,15);
+  const gs=myGroups();
+  const mine = t=>isAdmin()||gs.includes(t.approvalGroup);
+  const pend = tickets.filter(t=>t.approval==="Pending" && mine(t));
+  const decided = tickets.filter(t=>(t.approval==="Approved"||t.approval==="Rejected") && mine(t)).slice(0,15);
   const row = t=>`<div class="trow" data-open="${t.id}">
       <div class="c-id">${t.id}</div>
       <div class="c-sub"><div class="subj">${esc(t.subject)}</div>
         <div class="meta">${esc(t.createdBy)} · ${esc(t.category||t.module||"—")} · ${esc(t.dept||"—")} · ${esc(t.created)}</div></div>
+      <div class="c-eng" style="width:170px"><span class="modtag">${esc(t.approvalGroup||"—")}</span></div>
       <div class="c-st"><span class="pill" style="background:${t.approval==="Pending"?"#FCF1D8":t.approval==="Approved"?"#E4F2E7":"#FEE8E4"};color:${t.approval==="Pending"?"#8A5A00":t.approval==="Approved"?"#1F6B36":"#B3341C"}">${t.approval}</span></div>
       <div class="c-eng">${esc(t.approvalBy||"—")}</div>
     </div>`;
   $("view").innerHTML=`
-    <div class="pagetitle">Approvals</div>
+    <div class="pagetitle">Approvals ${isAdmin()?"(all groups)":gs.length?"— "+gs.join(", "):""}</div>
     <div class="panel" style="margin-bottom:14px"><h3>Awaiting your decision (${pend.length})</h3>
       <div class="table" style="border:none">${pend.map(row).join("")||`<div class="empty">Nothing waiting for approval. 🎉</div>`}</div>
     </div>
@@ -916,6 +955,17 @@ function openNewModal(){
   $("nCategory").innerHTML=`<option value=""></option>`+cfg.categories.map(c=>`<option>${esc(c)}</option>`).join("");
   $("nPriority").innerHTML=cfg.priorities.map(p=>`<option ${p==="Medium"?"selected":""}>${esc(p)}</option>`).join("");
   $("nReqRow").style.display=isStaff()?"block":"none";
+  const updateApprovalInfo=()=>{
+    const cat=$("nCategory").value, box=$("nApprovalInfo");
+    if(needsApproval(cat)){
+      const g=routingGroup(cat), names=approverNames(g);
+      box.innerHTML=`<b>⏳ This request requires ${esc(g)} approval.</b><br>
+        After you submit, it goes to ${names?("<b>"+esc(names)+"</b>"):("the "+esc(g))} for approval before IT can make the change. You'll be notified by email of the decision.`;
+      box.style.display="block";
+    } else box.style.display="none";
+  };
+  $("nCategory").onchange=updateApprovalInfo;
+  updateApprovalInfo();
   $("newOverlay").classList.add("show");
 }
 $("btnNCancel").onclick=()=>$("newOverlay").classList.remove("show");
@@ -932,7 +982,7 @@ $("btnNCreate").onclick=async ()=>{
     dept:$("nDept").value, email:reqEmail, priority:$("nPriority").value,
     category:$("nCategory").value, module:$("nCategory").value, subject, desc,
     status:"Open", engineer:"", assigned:"IT Team", closed:"", updated:nowIso(),
-    approval: needsAppr?"Pending":"", approvalBy:"", approvalAt:"", approvalNote:"",
+    approval: needsAppr?"Pending":"", approvalGroup: needsAppr?routingGroup($("nCategory").value):"", approvalBy:"", approvalAt:"", approvalNote:"",
     comments:[], activity:[{at:nowIso(),by:me.name,text:"Ticket created"+(needsAppr?" — manager approval required":"")}], resolution:""
   };
   try{
@@ -1097,12 +1147,15 @@ function renderAdmin(){
       <div class="panel"><h3>Users & roles</h3><div id="admUsers"></div></div>
       <div class="panel"><h3>SLA hours by priority</h3><div id="admSla"></div></div>
       <div class="panel"><h3>Approval workflow</h3>
-        <div class="flabel" style="margin-bottom:4px">Operation Manager approvers (by account)</div>
-        <div id="admApprovers"></div>
-        <div class="addrow"><select id="addApprover" style="flex:1"></select><button class="btn sm primary" id="btnAddApprover">Add</button></div>
-        <div class="flabel" style="margin:14px 0 4px">Categories that require approval</div>
-        <div id="admApCats"></div>
-        <div class="addrow"><select id="addApCat" style="flex:1"></select><button class="btn sm primary" id="btnAddApCat">Add</button></div>
+        <div id="admGroups"></div>
+        <div class="addrow"><input id="addGroupName" placeholder="New approval group name…"><button class="btn sm primary" id="btnAddGroup">Add group</button></div>
+        <div class="flabel" style="margin:16px 0 4px">Category → approval routing</div>
+        <div id="admRouting"></div>
+        <div class="addrow">
+          <select id="addRouteCat" style="flex:1"></select>
+          <select id="addRouteGroup"></select>
+          <button class="btn sm primary" id="btnAddRoute">Route</button>
+        </div>
       </div>
       ${lists.map(([k,l])=>`<div class="panel"><h3>${l}</h3><div id="adm_${k}"></div>
         <div class="addrow"><input id="add_${k}" placeholder="Add new…"><button class="btn sm primary" data-add="${k}">Add</button></div></div>`).join("")}
@@ -1127,31 +1180,55 @@ function renderAdmin(){
     const sla={}; document.querySelectorAll("[data-sla]").forEach(i=>sla[i.dataset.sla]=Number(i.value)||24);
     await setDoc(doc(db,"settings","config"), {...cfg, sla}, {merge:true}); toast("SLA saved");
   };
-  // approval workflow admin
-  const apr=(cfg.approvers||[]), apc=(cfg.approvalCategories||[]);
-  $("admApprovers").innerHTML = apr.map((a,i)=>`<div class="listrow"><span>${esc(a)}</span>
-    <button class="btn sm danger" data-delapr="${i}">Remove</button></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>No approvers yet — approval emails will not be sent.</div>";
-  $("addApprover").innerHTML = users.filter(u=>!apr.map(x=>x.toLowerCase()).includes(u.email.toLowerCase()))
-    .map(u=>`<option value="${esc(u.email)}">${esc(u.name)} — ${esc(u.email)}</option>`).join("");
-  $("btnAddApprover").onclick=async ()=>{
-    const v=$("addApprover").value; if(!v) return;
-    await setDoc(doc(db,"settings","config"),{...cfg,approvers:[...apr,v]},{merge:true}); toast("Approver added");
-  };
-  document.querySelectorAll("[data-delapr]").forEach(b=>b.onclick=async ()=>{
-    const arr=[...apr]; arr.splice(Number(b.dataset.delapr),1);
-    await setDoc(doc(db,"settings","config"),{...cfg,approvers:arr},{merge:true}); toast("Approver removed");
+  // approval workflow admin — groups & routing
+  const grps = cfg.approvalGroups||{};
+  const routing = cfg.approvalRouting||{};
+  const saveCfg = async (patch) => { await setDoc(doc(db,"settings","config"),{...cfg,...patch},{merge:true}); };
+  $("admGroups").innerHTML = Object.entries(grps).map(([g,list])=>`
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;margin-bottom:6px"><b style="flex:1">${esc(g)}</b>
+        <button class="btn sm danger" data-delgroup="${esc(g)}">Delete group</button></div>
+      ${list.map((a,i)=>`<div class="listrow"><span>${esc(approverLabel(a))} — ${esc(a)}</span>
+        <button class="btn sm danger" data-delappr="${esc(g)}:${i}">Remove</button></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>No approvers — requests to this group notify nobody.</div>"}
+      <div class="addrow"><select data-addsel="${esc(g)}" style="flex:1">${users.filter(u=>!list.map(x=>String(x).toLowerCase()).includes(u.email.toLowerCase())).map(u=>`<option value="${esc(u.email)}">${esc(u.name)} — ${esc(u.email)}</option>`).join("")}</select>
+        <button class="btn sm primary" data-addappr="${esc(g)}">Add approver</button></div>
+    </div>`).join("");
+  $("admGroups").querySelectorAll("[data-addappr]").forEach(b=>b.onclick=async ()=>{
+    const g=b.dataset.addappr, sel=document.querySelector(`[data-addsel="${CSS.escape(g)}"]`);
+    const v=sel&&sel.value; if(!v) return;
+    const u=users.find(x=>x.email===v);
+    const labels={...(cfg.approverLabels||{})}; if(u) labels[v.toLowerCase()]=u.name;
+    await saveCfg({approvalGroups:{...grps,[g]:[...(grps[g]||[]),v]}, approverLabels:labels}); toast("Approver added to "+g);
   });
-  $("admApCats").innerHTML = apc.map((c,i)=>`<div class="listrow"><span>${esc(c)}</span>
-    <button class="btn sm danger" data-delapc="${i}">Remove</button></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>No categories flagged.</div>";
-  $("addApCat").innerHTML = (cfg.categories||[]).filter(c=>!apc.includes(c)).map(c=>`<option>${esc(c)}</option>`).join("");
-  $("btnAddApCat").onclick=async ()=>{
-    const v=$("addApCat").value; if(!v) return;
-    await setDoc(doc(db,"settings","config"),{...cfg,approvalCategories:[...apc,v]},{merge:true}); toast("Category flagged for approval");
-  };
-  document.querySelectorAll("[data-delapc]").forEach(b=>b.onclick=async ()=>{
-    const arr=[...apc]; arr.splice(Number(b.dataset.delapc),1);
-    await setDoc(doc(db,"settings","config"),{...cfg,approvalCategories:arr},{merge:true}); toast("Removed");
+  $("admGroups").querySelectorAll("[data-delappr]").forEach(b=>b.onclick=async ()=>{
+    const [g,i]=b.dataset.delappr.split(":");
+    const arr=[...(grps[g]||[])]; arr.splice(Number(i),1);
+    await saveCfg({approvalGroups:{...grps,[g]:arr}}); toast("Approver removed");
   });
+  $("admGroups").querySelectorAll("[data-delgroup]").forEach(b=>b.onclick=async ()=>{
+    const g=b.dataset.delgroup;
+    if(Object.values(routing).includes(g)){ toast("Remove this group's category routings first"); return; }
+    if(!confirm("Delete approval group '"+g+"'?")) return;
+    const ng={...grps}; delete ng[g];
+    await saveCfg({approvalGroups:ng}); toast("Group deleted");
+  });
+  $("btnAddGroup").onclick=async ()=>{
+    const v=$("addGroupName").value.trim(); if(!v||grps[v]) return;
+    await saveCfg({approvalGroups:{...grps,[v]:[]}}); $("addGroupName").value=""; toast("Group added");
+  };
+  $("admRouting").innerHTML = Object.entries(routing).map(([c,g])=>`
+    <div class="listrow"><span>${esc(c)} <span style="color:var(--mut)">→</span> <b>${esc(g)}</b></span>
+      <button class="btn sm danger" data-delroute="${esc(c)}">Remove</button></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>No categories require approval.</div>";
+  $("admRouting").querySelectorAll("[data-delroute]").forEach(b=>b.onclick=async ()=>{
+    const nr={...routing}; delete nr[b.dataset.delroute];
+    await saveCfg({approvalRouting:nr}); toast("Routing removed");
+  });
+  $("addRouteCat").innerHTML=(cfg.categories||[]).filter(c=>!routing[c]).map(c=>`<option>${esc(c)}</option>`).join("");
+  $("addRouteGroup").innerHTML=Object.keys(grps).map(g=>`<option>${esc(g)}</option>`).join("");
+  $("btnAddRoute").onclick=async ()=>{
+    const c=$("addRouteCat").value, g=$("addRouteGroup").value; if(!c||!g) return;
+    await saveCfg({approvalRouting:{...routing,[c]:g}}); toast(c+" now requires "+g+" approval");
+  };
   // simple lists
   lists.forEach(([k])=>{
     const box=$("adm_"+k);
