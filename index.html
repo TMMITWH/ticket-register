@@ -906,13 +906,14 @@ async function saveAttachment(ticketId, file){
 /* ---------- approval workflow (routed groups) ---------- */
 async function requestApproval(t, group){
   await patchTicket(t.id,{approval:"Pending",approvalGroup:group,approvalBy:"",approvalAt:"",approvalNote:""},`${group} approval requested`);
-  notifyApprovers({...t, approvalGroup:group});
+  notifyApprovers({...t, approvalGroup:group}, me.name);
   toast("Approval requested from "+group);
 }
-function notifyApprovers(t){
+function notifyApprovers(t, requestedBy){
   const g = t.approvalGroup || routingGroup(t.category||t.module);
-  ((cfg.approvalGroups||{})[g]||[]).forEach(a=>queueMail(a, `Approval required — Ticket #${t.id}`,
-`Dear ${approverLabel(a)},\n\nTicket #${t.id} requires ${g} approval before IT can proceed.\n\nSubject: ${t.subject}\nCategory: ${t.category||t.module||"—"}\nRequester: ${t.createdBy} <${t.email}>\nPriority: ${t.priority}\n\nPlease log in to the helpdesk, open the Approvals tab, and Approve or Reject.${trackFooter(t.id)}`));
+  const details = (t.desc||"").trim().substring(0,600);
+  ((cfg.approvalGroups||{})[g]||[]).forEach(a=>queueMail(a, `Approval required — Ticket #${t.id}: ${t.subject}`,
+`Dear ${approverLabel(a)},\n\nTicket #${t.id} requires ${g} approval before IT can proceed.\n\nSubject: ${t.subject}\nCategory: ${t.category||t.module||"—"}\nRequester: ${t.createdBy} <${t.email}>\nDepartment: ${t.dept||"—"} · Priority: ${t.priority}${requestedBy?"\nApproval requested by: "+requestedBy:""}\n\nIssue details:\n${details||"(no description recorded)"}\n\nTo decide: log in to the helpdesk, open the Approvals tab, and Approve or Reject.${trackFooter(t.id)}`));
 }
 async function decideApproval(t,decision){
   const note = prompt(decision==="Approved" ? "Optional note for the approval:" : "Reason for rejection (recommended):") || "";
