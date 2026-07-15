@@ -239,19 +239,21 @@ const DEFAULT_CFG = {
   departments:["IT","HR","Operations","Transport","Documentation","Inventory","Finance","Freight"],
   categories:["TM","EWM","SD","FI","MM","BASIS","Security","Hardware","Network","Access Request",
               "CBM Change","Billing","Cost Adjustment","Pick Cancel","Vendor Batch Update",
-              "Invoice Change","Cost Change","Credit Note","Other"],
+              "Invoice Change","Cost Change","Credit Note","Code Change","Other"],
   priorities:["Low","Medium","High","Critical"],
   sla:{Low:72,Medium:24,High:8,Critical:4},
   approvalGroups:{
     "Operation Managers":["binoy@tmm.ae","sambenjamin@tmm.ae"],
-    "GM":["jubi@tmm.ae"]
+    "GM":["jubi@tmm.ae"],
+    "SAP Project Manager":["ranjit.p@sybnoc.com"]
   },
   approvalRouting:{
     "CBM Change":"Operation Managers","Billing":"Operation Managers","Cost Adjustment":"Operation Managers",
     "Pick Cancel":"Operation Managers","Vendor Batch Update":"Operation Managers",
-    "Invoice Change":"GM","Cost Change":"GM","Credit Note":"GM"
+    "Invoice Change":"GM","Cost Change":"GM","Credit Note":"GM",
+    "Code Change":"SAP Project Manager"
   },
-  approverLabels:{"binoy@tmm.ae":"Binoy","sambenjamin@tmm.ae":"Sam Benjamin","jubi@tmm.ae":"Jubi Mathai"}
+  approverLabels:{"binoy@tmm.ae":"Binoy","sambenjamin@tmm.ae":"Sam Benjamin","jubi@tmm.ae":"Jubi Mathai","ranjit.p@sybnoc.com":"Ranjit"}
 };
 const STAFF_ROLES = ["IT Support","Consultant","Admin"];
 
