@@ -1254,7 +1254,9 @@ function renderAdmin(){
   // approval workflow admin — groups & routing
   const grps = cfg.approvalGroups||{};
   const routing = cfg.approvalRouting||{};
-  const saveCfg = async (patch) => { await setDoc(doc(db,"settings","config"),{...cfg,...patch},{merge:true}); };
+  // NOTE: no {merge:true} here — merge would silently resurrect deleted map keys
+  // (approval routings and groups are maps; deletions only persist with a full write).
+  const saveCfg = async (patch) => { await setDoc(doc(db,"settings","config"),{...cfg,...patch}); };
   $("admGroups").innerHTML = `<datalist id="userEmailList">${users.map(u=>`<option value="${esc(u.email)}">${esc(u.name)}</option>`).join("")}</datalist>` +
     Object.entries(grps).map(([g,list])=>`
     <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px">
