@@ -1063,6 +1063,37 @@ function renderReports(){
     const h=hoursOpen(t); if(isFinite(h)){ byEng[e].res++; byEng[e].hrs+=h; if(h<=slaHours(t)) byEng[e].sla++; }
   });
 
+  // approval analytics
+  const apRequestedAt = t=>{
+    const a=(t.activity||[]).find(x=>/approval/i.test(x.text||""));
+    return new Date((a&&a.at) || t.createdAt || (t.created?t.created+"T09:00:00":NaN));
+  };
+  const apPendingAll = tickets.filter(t=>t.approval==="Pending").map(t=>{
+    const r=apRequestedAt(t);
+    return {t, days: isNaN(r)?0:Math.max(0,Math.floor((now-r)/86400000))};
+  }).sort((a,b)=>b.days-a.days);
+  const apDecided = tickets.filter(t=>(t.approval==="Approved"||t.approval==="Rejected") && inR(new Date(t.approvalAt||NaN)))
+    .map(t=>{
+      const r=apRequestedAt(t), d=new Date(t.approvalAt);
+      const h=(!isNaN(r)&&!isNaN(d))?Math.max(0,(d-r)/3600000):NaN;
+      return {t,h};
+    });
+  const apTimes = apDecided.filter(x=>isFinite(x.h));
+  const apAvgH = apTimes.length?Math.round(apTimes.reduce((a,x)=>a+x.h,0)/apTimes.length):null;
+  const apRejRate = apDecided.length?Math.round(apDecided.filter(x=>x.t.approval==="Rejected").length/apDecided.length*100):0;
+  const byApprover={};
+  apDecided.forEach(x=>{
+    const a=x.t.approvalBy||"—"; byApprover[a]=byApprover[a]||{n:0,ok:0,no:0,hrs:0,th:0};
+    byApprover[a].n++;
+    if(x.t.approval==="Approved") byApprover[a].ok++; else byApprover[a].no++;
+    if(isFinite(x.h)){byApprover[a].hrs+=x.h; byApprover[a].th++;}
+  });
+  const byApGroup={};
+  tickets.filter(t=>t.approval).forEach(t=>{
+    const g=t.approvalGroup||"—"; byApGroup[g]=byApGroup[g]||{p:0,a:0,r:0};
+    if(t.approval==="Pending")byApGroup[g].p++; else if(t.approval==="Approved"&&inR(new Date(t.approvalAt||NaN)))byApGroup[g].a++; else if(t.approval==="Rejected"&&inR(new Date(t.approvalAt||NaN)))byApGroup[g].r++;
+  });
+
   const bar=(label,v,max,color)=>`<div class="barrow"><div class="bl">${esc(label)}</div>
     <div class="bt"><div class="bf" style="width:${Math.round(v/max*100)}%;background:${color||"#2E6BC4"}"></div></div><div class="bv">${v}</div></div>`;
 
@@ -1112,6 +1143,43 @@ function renderReports(){
           <span>${v.res?Math.round(v.hrs/v.res)+"h":"—"}</span>
           <span style="color:${v.res&&v.sla/v.res>=0.8?"#2E8B4A":"#B3341C"}">${v.res?Math.round(v.sla/v.res*100)+"%":"—"}</span>
         </div>`).join("")}
+    </div>
+    <div class="panelrow">
+      <div class="panel"><h3>Approval workflow (range)</h3>
+        <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(105px,1fr));margin-bottom:10px">
+          <div class="card static"><div class="cl">Pending now</div><div class="cv" style="color:#D99000">${apPendingAll.length}</div></div>
+          <div class="card static"><div class="cl">Approved</div><div class="cv" style="color:#2E8B4A">${apDecided.filter(x=>x.t.approval==="Approved").length}</div></div>
+          <div class="card static"><div class="cl">Rejected</div><div class="cv" style="color:#B3341C">${apDecided.filter(x=>x.t.approval==="Rejected").length}</div></div>
+          <div class="card static"><div class="cl">Avg decision</div><div class="cv">${apAvgH!==null?apAvgH+"h":"—"}</div></div>
+          <div class="card static"><div class="cl">Rejection rate</div><div class="cv" style="color:${apRejRate>25?"#B3341C":"#1E2530"}">${apDecided.length?apRejRate+"%":"—"}</div></div>
+        </div>
+        <div class="flabel" style="margin-bottom:4px">Waiting longest (pending)</div>
+        ${apPendingAll.slice(0,5).map(x=>`<div class="listrow"><span>#${x.t.id} ${esc(x.t.subject)} <span style="color:var(--mut)">→ ${esc(x.t.approvalGroup||"—")}</span></span>
+          <b style="flex:0 0 auto;color:${x.days>2?"#B3341C":"#374151"}">${x.days}d</b></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>Nothing pending. 🎉</div>"}
+      </div>
+      <div class="panel"><h3>Decisions by approver (range)</h3>
+        <div class="urow" style="grid-template-columns:1fr 90px 90px 90px 110px;font-weight:700;color:var(--mut);font-size:11px;text-transform:uppercase">
+          <span>Approver</span><span>Decisions</span><span>Approved</span><span>Rejected</span><span>Avg time</span></div>
+        ${Object.entries(byApprover).sort((a,b)=>b[1].n-a[1].n).map(([a,v])=>`
+          <div class="urow" style="grid-template-columns:1fr 90px 90px 90px 110px">
+            <b>${esc(a)}</b><span>${v.n}</span><span style="color:#2E8B4A">${v.ok}</span><span style="color:#B3341C">${v.no}</span>
+            <span>${v.th?Math.round(v.hrs/v.th)+"h":"—"}</span></div>`).join("")||"<div class='empty'>No decisions in range</div>"}
+        <div class="flabel" style="margin:12px 0 4px">By approval group</div>
+        ${Object.entries(byApGroup).map(([g,v])=>`<div class="listrow"><span><b>${esc(g)}</b></span>
+          <span style="flex:0 0 auto;font-size:12px;color:var(--mut)">${v.p} pending · <span style="color:#2E8B4A">${v.a} approved</span> · <span style="color:#B3341C">${v.r} rejected</span></span></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>No approval activity</div>"}
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:16px"><h3>Resolution time vs SLA target, by priority (range)</h3>
+      ${cfg.priorities.map(p=>{
+        const d=durs.filter(x=>x.t.priority===p);
+        if(!d.length) return "";
+        const avg=Math.round(d.reduce((a,x)=>a+x.h,0)/d.length), tgt=(cfg.sla&&cfg.sla[p])||24;
+        const pct=Math.min(100,Math.round(avg/Math.max(avg,tgt)*100));
+        return `<div class="barrow"><div class="bl">${esc(p)} (${d.length})</div>
+          <div class="bt"><div class="bf" style="width:${pct}%;background:${avg<=tgt?"#2E8B4A":"#B3341C"}"></div></div>
+          <div class="bv" style="width:110px">${avg}h / ${tgt}h</div></div>`;
+      }).join("")||"<div class='empty'>No resolved tickets in range</div>"}
+      <div style="font-size:11px;color:var(--mut);margin-top:8px">Green = resolving within the SLA target on average · Red = average exceeds the target (avg / target).</div>
     </div>`;
   $("view").querySelectorAll("[data-range]").forEach(b=>b.onclick=()=>{RPT.range=b.dataset.range; renderReports();});
   $("rCsv").onclick=exportCSV;
