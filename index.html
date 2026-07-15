@@ -1255,20 +1255,24 @@ function renderAdmin(){
   const grps = cfg.approvalGroups||{};
   const routing = cfg.approvalRouting||{};
   const saveCfg = async (patch) => { await setDoc(doc(db,"settings","config"),{...cfg,...patch},{merge:true}); };
-  $("admGroups").innerHTML = Object.entries(grps).map(([g,list])=>`
+  $("admGroups").innerHTML = `<datalist id="userEmailList">${users.map(u=>`<option value="${esc(u.email)}">${esc(u.name)}</option>`).join("")}</datalist>` +
+    Object.entries(grps).map(([g,list])=>`
     <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px">
       <div style="display:flex;align-items:center;margin-bottom:6px"><b style="flex:1">${esc(g)}</b>
         <button class="btn sm danger" data-delgroup="${esc(g)}">Delete group</button></div>
       ${list.map((a,i)=>`<div class="listrow"><span>${esc(approverLabel(a))} — ${esc(a)}</span>
         <button class="btn sm danger" data-delappr="${esc(g)}:${i}">Remove</button></div>`).join("")||"<div style='font-size:12px;color:var(--mut)'>No approvers — requests to this group notify nobody.</div>"}
-      <div class="addrow"><select data-addsel="${esc(g)}" style="flex:1">${users.filter(u=>!list.map(x=>String(x).toLowerCase()).includes(u.email.toLowerCase())).map(u=>`<option value="${esc(u.email)}">${esc(u.name)} — ${esc(u.email)}</option>`).join("")}</select>
+      <div class="addrow"><input type="email" data-addsel="${esc(g)}" list="userEmailList" placeholder="Type approver's email or pick a user…" style="flex:1">
         <button class="btn sm primary" data-addappr="${esc(g)}">Add approver</button></div>
     </div>`).join("");
   $("admGroups").querySelectorAll("[data-addappr]").forEach(b=>b.onclick=async ()=>{
-    const g=b.dataset.addappr, sel=document.querySelector(`[data-addsel="${CSS.escape(g)}"]`);
-    const v=sel&&sel.value; if(!v) return;
-    const u=users.find(x=>x.email===v);
-    const labels={...(cfg.approverLabels||{})}; if(u) labels[v.toLowerCase()]=u.name;
+    const g=b.dataset.addappr, inp=document.querySelector(`input[data-addsel="${CSS.escape(g)}"]`);
+    const v=(inp&&inp.value.trim().toLowerCase())||"";
+    if(!v.includes("@")){ toast("Enter a valid email address"); return; }
+    if((grps[g]||[]).map(x=>String(x).toLowerCase()).includes(v)){ toast("Already an approver in this group"); return; }
+    const u=users.find(x=>x.email.toLowerCase()===v);
+    const labels={...(cfg.approverLabels||{})};
+    labels[v]= u ? u.name : v.split("@")[0].replace(/[._]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
     await saveCfg({approvalGroups:{...grps,[g]:[...(grps[g]||[]),v]}, approverLabels:labels}); toast("Approver added to "+g);
   });
   $("admGroups").querySelectorAll("[data-delappr]").forEach(b=>b.onclick=async ()=>{
