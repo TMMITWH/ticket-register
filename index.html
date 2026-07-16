@@ -305,9 +305,19 @@ function hoursOpen(t){
   if(isNaN(end)) end = new Date();
   return Math.max(0,(end-start)/3600000);
 }
-function isOverdue(t){ const h=hoursOpen(t); return ACTIVE(t.status) && isFinite(h) && h > slaHours(t); }
+function isOverdue(t){
+  if(!ACTIVE(t.status)) return false;
+  if(t.expectedDate){ return today() > t.expectedDate; }
+  const h=hoursOpen(t); return isFinite(h) && h > slaHours(t);
+}
 function slaLeft(t){
   if(!ACTIVE(t.status)) return "—";
+  if(t.expectedDate){
+    const d = Math.round((new Date(t.expectedDate) - new Date(today()))/86400000);
+    if(d<0) return "OVERDUE";
+    if(d===0) return "Today";
+    return d+"d";
+  }
   const h = hoursOpen(t);
   if(!isFinite(h)) return "—";
   const left = slaHours(t)-h;
@@ -588,7 +598,7 @@ function renderTickets(){
         <div class="th c-id">#</div><div class="th c-sub">Subject / Requester</div>
         <div class="th c-pri">Priority</div><div class="th c-st">Status</div>
         ${isStaff()?`<div class="th c-eng">Engineer</div>`:""}
-        <div class="th c-sla">SLA</div>
+        <div class="th c-sla">Due</div>
       </div>
       <div id="tRows"></div>
     </div>`;
@@ -744,10 +754,12 @@ function renderDetail(){
           <select id="dCa" ${staff?"":"disabled"}><option value=""></option>${cfg.categories.map(x=>`<option ${(t.category||t.module)===x?"selected":""}>${x}</option>`).join("")}</select></label>
         <label><div class="flabel">Department</div>
           <select id="dDe" ${staff?"":"disabled"}><option value=""></option>${cfg.departments.map(x=>`<option ${t.dept===x?"selected":""}>${x}</option>`).join("")}</select></label>
+        <label><div class="flabel">Expected completion</div>
+          <input type="date" id="dDue" value="${esc(t.expectedDate||"")}" ${staff?"":"disabled"} min="${today()}"></label>
       </div>
       <div style="font-size:12px;color:var(--mut);margin-bottom:10px">
         Requester: <b style="color:var(--ink2)">${esc(t.createdBy)}</b> &lt;${esc(t.email)||"—"}&gt;
-        · Created ${esc(t.created)} · Last updated ${fmtDT(t.updated)} · SLA ${slaHours(t)}h (${slaLeft(t)})
+        · Created ${esc(t.created)} · Last updated ${fmtDT(t.updated)} · ${t.expectedDate?`Expected by ${esc(t.expectedDate)} (${slaLeft(t)})`:`SLA ${slaHours(t)}h (${slaLeft(t)})`}
       </div>
       ${t.approval?`<div style="border-radius:9px;padding:10px 14px;margin-bottom:12px;font-size:13px;
           background:${t.approval==="Pending"?"#FCF1D8":t.approval==="Approved"?"#E4F2E7":"#FEE8E4"};
@@ -841,6 +853,11 @@ function renderDetail(){
     };
     $("dCa").onchange=e=>patchTicket(t.id,{category:e.target.value},`Category set to ${e.target.value}`);
     $("dDe").onchange=e=>patchTicket(t.id,{dept:e.target.value},`Department set to ${e.target.value}`);
+    $("dDue").onchange=e=>{
+      const v=e.target.value;
+      patchTicket(t.id,{expectedDate:v}, v?`Expected completion set to ${v}`:"Expected completion date cleared",
+        v?`Your ticket is expected to be completed by ${v}. We'll keep you updated.`:null);
+    };
     if($("dResSave")) $("dResSave").onclick=()=>patchTicket(t.id,{resolution:$("dResText").value.trim()},"Resolution updated");
   }
   if($("dEsc")) $("dEsc").onclick=()=>{
