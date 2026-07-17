@@ -278,6 +278,15 @@ let unsubs=[];
 const isStaff = () => me && STAFF_ROLES.includes(me.role);
 const isAdmin = () => me && me.role==="Admin";
 const canManage = () => me && (me.role==="Consultant"||me.role==="Admin");
+const restrictedConsultant = () => me && me.role==="Consultant" && !me.fullAccess;
+const canSeeTicket = t => {
+  if(!me) return false;
+  const own = (t.email||"").toLowerCase()===me.email.toLowerCase() || t.createdByUid===me.uid;
+  if(!isStaff()) return own;
+  if(restrictedConsultant()) return t.engineer===me.name || own || (t.approval==="Pending" && canApprove(t));
+  return true;
+};
+const myTickets = () => tickets.filter(canSeeTicket);
 const routingGroup = cat => (cfg.approvalRouting||{})[cat] || "";
 const needsApproval = cat => !!routingGroup(cat);
 const groupApprovers = g => ((cfg.approvalGroups||{})[g]||[]).map(e=>String(e).toLowerCase());
@@ -291,7 +300,6 @@ function approverLabel(email){
   return u ? u.name : email;
 }
 function approverNames(group){ return ((cfg.approvalGroups||{})[group]||[]).map(approverLabel).join(", "); }
-const myTickets = () => isStaff() ? tickets : tickets.filter(t => (t.email||"").toLowerCase()===me.email.toLowerCase() || t.createdByUid===me.uid);
 const engineers = () => users.filter(u=>STAFF_ROLES.includes(u.role));
 
 /* ---------- SLA ---------- */
@@ -457,6 +465,10 @@ function startApp(){
   $("uRole").textContent = me.role;
   $("btnLogout").onclick = ()=>signOut(auth);
 
+  // keep own profile live (role / full-access changes apply without re-login)
+  unsubs.push(onSnapshot(doc(db,"users",me.uid), s=>{
+    if(s.exists()){ me=s.data(); $("uRole").textContent=me.role; render(); }
+  }, ()=>{}));
   unsubs.push(onSnapshot(collection(db,"tickets"), s=>{
     tickets = s.docs.map(d=>d.data()).sort((a,b)=>b.id-a.id);
     render();
@@ -709,7 +721,8 @@ let attCache={}; // ticketId -> [{id,name,mime,size,data}]
 let editMode=false;
 function renderDetail(){
   const d=$("detail");
-  const t=tickets.find(x=>x.id===openTicketId);
+  let t=tickets.find(x=>x.id===openTicketId);
+  if(t && !canSeeTicket(t) && !(t.approval==="Pending"&&canApprove(t))){ toast("You don't have access to ticket #"+t.id); t=null; openTicketId=null; }
   if(!t){ d.classList.remove("open"); d.innerHTML=""; editMode=false; return; }
   const s=STC[t.status]||STC.Open;
   const staff=isStaff();
@@ -1024,12 +1037,13 @@ let RPT={range:"30"}; // 7 | 30 | 90 | 365 | all
 function tCreatedDate(t){ return new Date(t.createdAt || (t.created ? t.created+"T09:00:00" : NaN)); }
 function tClosedDate(t){ return new Date(t.resolvedAt || (t.closed ? t.closed+"T17:00:00" : NaN)); }
 function renderReports(){
+  const TK = restrictedConsultant() ? myTickets() : tickets;   // consultants see their own workload only
   const now=new Date();
   const cutoff = RPT.range==="all" ? null : new Date(now - Number(RPT.range)*86400000);
   const inR = d => d instanceof Date && !isNaN(d) && (!cutoff || d>=cutoff);
-  const created = tickets.filter(t=>inR(tCreatedDate(t)));
-  const resolved = tickets.filter(t=>!ACTIVE(t.status) && inR(tClosedDate(t)));
-  const activeNow = tickets.filter(t=>ACTIVE(t.status));
+  const created = TK.filter(t=>inR(tCreatedDate(t)));
+  const resolved = TK.filter(t=>!ACTIVE(t.status) && inR(tClosedDate(t)));
+  const activeNow = TK.filter(t=>ACTIVE(t.status));
   const overdueNow = activeNow.filter(isOverdue);
   const durs = resolved.map(t=>({t,h:hoursOpen(t)})).filter(x=>isFinite(x.h));
   const avgRes = durs.length?Math.round(durs.reduce((a,x)=>a+x.h,0)/durs.length):0;
@@ -1042,8 +1056,8 @@ function renderReports(){
     const start=new Date(now-((i+1)*7)*86400000), end=new Date(now-(i*7)*86400000);
     weeks.push({
       label: end.toLocaleDateString(undefined,{day:"2-digit",month:"short"}),
-      c: tickets.filter(t=>{const d=tCreatedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length,
-      r: tickets.filter(t=>{if(ACTIVE(t.status))return false;const d=tClosedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length
+      c: TK.filter(t=>{const d=tCreatedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length,
+      r: TK.filter(t=>{if(ACTIVE(t.status))return false;const d=tClosedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length
     });
   }
   const trendSvg = trendChart(weeks);
@@ -1073,7 +1087,7 @@ function renderReports(){
 
   // engineer table
   const byEng={};
-  tickets.forEach(t=>{
+  TK.forEach(t=>{
     const e=t.engineer||"Unassigned"; byEng[e]=byEng[e]||{open:0,res:0,hrs:0,sla:0};
     if(ACTIVE(t.status)) byEng[e].open++;
   });
@@ -1087,11 +1101,11 @@ function renderReports(){
     const a=(t.activity||[]).find(x=>/approval/i.test(x.text||""));
     return new Date((a&&a.at) || t.createdAt || (t.created?t.created+"T09:00:00":NaN));
   };
-  const apPendingAll = tickets.filter(t=>t.approval==="Pending").map(t=>{
+  const apPendingAll = TK.filter(t=>t.approval==="Pending").map(t=>{
     const r=apRequestedAt(t);
     return {t, days: isNaN(r)?0:Math.max(0,Math.floor((now-r)/86400000))};
   }).sort((a,b)=>b.days-a.days);
-  const apDecided = tickets.filter(t=>(t.approval==="Approved"||t.approval==="Rejected") && inR(new Date(t.approvalAt||NaN)))
+  const apDecided = TK.filter(t=>(t.approval==="Approved"||t.approval==="Rejected") && inR(new Date(t.approvalAt||NaN)))
     .map(t=>{
       const r=apRequestedAt(t), d=new Date(t.approvalAt);
       const h=(!isNaN(r)&&!isNaN(d))?Math.max(0,(d-r)/3600000):NaN;
@@ -1108,7 +1122,7 @@ function renderReports(){
     if(isFinite(x.h)){byApprover[a].hrs+=x.h; byApprover[a].th++;}
   });
   const byApGroup={};
-  tickets.filter(t=>t.approval).forEach(t=>{
+  TK.filter(t=>t.approval).forEach(t=>{
     const g=t.approvalGroup||"—"; byApGroup[g]=byApGroup[g]||{p:0,a:0,r:0};
     if(t.approval==="Pending")byApGroup[g].p++; else if(t.approval==="Approved"&&inR(new Date(t.approvalAt||NaN)))byApGroup[g].a++; else if(t.approval==="Rejected"&&inR(new Date(t.approvalAt||NaN)))byApGroup[g].r++;
   });
@@ -1250,10 +1264,16 @@ function renderAdmin(){
     </div>`;
   // users
   $("admUsers").innerHTML = users.sort((a,b)=>a.name.localeCompare(b.name)).map(u=>`
-    <div class="urow"><b>${esc(u.name)}</b><span style="color:var(--mut)">${esc(u.email)}</span>
+    <div class="urow" style="grid-template-columns:1fr 1fr 120px 120px 80px">
+      <b>${esc(u.name)}</b><span style="color:var(--mut)">${esc(u.email)}</span>
       <select data-urole="${u.uid}">${["User","IT Support","Consultant","Admin"].map(r=>`<option ${u.role===r?"selected":""}>${r}</option>`).join("")}</select>
       <select data-udept="${u.uid}"><option value=""></option>${cfg.departments.map(d=>`<option ${u.dept===d?"selected":""}>${esc(d)}</option>`).join("")}</select>
+      ${u.role==="Consultant"?`<label style="font-size:11px;white-space:nowrap" title="Authorized to view ALL tickets, not only their own"><input type="checkbox" data-ufull="${u.uid}" ${u.fullAccess?"checked":""}> All tickets</label>`:`<span></span>`}
     </div>`).join("")||"<div class='empty'>No users yet</div>";
+  $("admUsers").querySelectorAll("[data-ufull]").forEach(c=>c.onchange=async e=>{
+    await updateDoc(doc(db,"users",c.dataset.ufull),{fullAccess:e.target.checked});
+    toast(e.target.checked?"Consultant authorized for all tickets":"Consultant limited to own tickets");
+  });
   $("admUsers").querySelectorAll("[data-urole]").forEach(s=>s.onchange=async e=>{
     await updateDoc(doc(db,"users",s.dataset.urole),{role:e.target.value}); toast("Role updated");
   });
