@@ -220,7 +220,8 @@ window.DEVELOPER_CREDIT = "Developed by Vineesh";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
          sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc, getDoc, addDoc, deleteDoc }
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+         collection, onSnapshot, doc, updateDoc, setDoc, getDoc, addDoc, deleteDoc }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ---------- constants ---------- */
@@ -275,6 +276,33 @@ let openTicketId=null, detailTab="conv";
 let F={status:"Active",priority:"All",dept:"All",cat:"All",eng:"All",from:"",to:"",q:""};
 let unsubs=[];
 
+/* ---------- derived-data cache ----------
+   Heavy full-collection scans (myTickets, dashboard stats, report datasets)
+   are recomputed only when the underlying data actually changes. `dataRev`
+   is bumped by the snapshot handlers; any memo from an older rev is dropped.
+   Plain re-renders (tab switches, filter typing, unrelated snapshots) reuse
+   the cached results instead of re-scanning all ~270 docs. */
+let dataRev = 0;
+let _memo = { rev: -1 };
+const bumpData = () => { dataRev++; };
+function memo(key, fn){
+  if(_memo.rev !== dataRev) _memo = { rev: dataRev };
+  if(!(key in _memo)) _memo[key] = fn();
+  return _memo[key];
+}
+/* Coarse clock bucket (5 min). Folded into the dashboard/report cache keys so
+   time-derived figures (overdue, SLA-left, aging) refresh at most every 5 min
+   instead of on every render — but still recompute instantly on any data change. */
+const timeBucket = () => Math.floor(Date.now()/300000);
+/* Coalesce bursts of snapshot callbacks (multi-user edits arrive in waves)
+   into a single render on the next frame. */
+let _renderQueued = false;
+function scheduleRender(){
+  if(_renderQueued) return;
+  _renderQueued = true;
+  requestAnimationFrame(()=>{ _renderQueued = false; render(); });
+}
+
 const isStaff = () => me && STAFF_ROLES.includes(me.role);
 const isAdmin = () => me && me.role==="Admin";
 const canManage = () => me && (me.role==="Consultant"||me.role==="Admin");
@@ -286,7 +314,7 @@ const canSeeTicket = t => {
   if(restrictedConsultant()) return t.engineer===me.name || own || (t.approval==="Pending" && canApprove(t));
   return true;
 };
-const myTickets = () => tickets.filter(canSeeTicket);
+const myTickets = () => memo("myTickets", () => tickets.filter(canSeeTicket));
 const routingGroup = cat => (cfg.approvalRouting||{})[cat] || "";
 const needsApproval = cat => !!routingGroup(cat);
 const groupApprovers = g => ((cfg.approvalGroups||{})[g]||[]).map(e=>String(e).toLowerCase());
@@ -367,7 +395,18 @@ if(!CFGV.apiKey || String(CFGV.apiKey).includes("PASTE")){
 }else{
   const app = initializeApp(CFGV);
   auth = getAuth(app);
-  db = getFirestore(app);
+  // Persistent IndexedDB cache: on every reload/new tab the tickets listener
+  // resumes from a stored token and the backend only bills documents changed
+  // since last sync — unchanged docs are served from cache (0 reads). The
+  // multi-tab manager shares one backend listener across a user's open tabs.
+  try{
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  }catch(e){
+    // Private-browsing / unsupported IndexedDB → fall back to default (network) cache.
+    db = getFirestore(app);
+  }
   onAuthStateChanged(auth, async (u)=>{
     unsubs.forEach(fn=>fn()); unsubs=[];
     if(!u){ me=null; showAuth(); return; }
@@ -467,16 +506,18 @@ function startApp(){
 
   // keep own profile live (role / full-access changes apply without re-login)
   unsubs.push(onSnapshot(doc(db,"users",me.uid), s=>{
-    if(s.exists()){ me=s.data(); $("uRole").textContent=me.role; render(); }
+    if(s.exists()){ me=s.data(); $("uRole").textContent=me.role; bumpData(); scheduleRender(); }
   }, ()=>{}));
   unsubs.push(onSnapshot(collection(db,"tickets"), s=>{
+    // With the persistent cache this fires from IndexedDB first, then streams
+    // only the docs the backend reports as changed since last sync.
     tickets = s.docs.map(d=>d.data()).sort((a,b)=>b.id-a.id);
-    render();
+    bumpData(); scheduleRender();
   }, e=>toast("Live connection issue: "+e.message)));
 
   if(isStaff()){
     unsubs.push(onSnapshot(collection(db,"users"), s=>{
-      users = s.docs.map(d=>d.data()); render();
+      users = s.docs.map(d=>d.data()); bumpData(); scheduleRender();
     }, ()=>{}));
   }
   unsubs.push(onSnapshot(doc(db,"settings","config"), s=>{
@@ -490,7 +531,7 @@ function startApp(){
       // every routed category must exist in the selectable category list
       cfg.categories = [...new Set([...(cfg.categories||[]), ...Object.keys(cfg.approvalRouting||{})])];
     }
-    render();
+    bumpData(); scheduleRender();
   }, ()=>{}));
 
   // deep link #t123
@@ -527,26 +568,29 @@ function render(){
 
 /* ---------- dashboard ---------- */
 function renderDashboard(){
-  const list = myTickets();
-  const by = s=>list.filter(t=>t.status===s).length;
-  const overdue = list.filter(isOverdue).length;
-  const high = list.filter(t=>ACTIVE(t.status)&&(t.priority==="High"||t.priority==="Critical")).length;
-  const cards = [
-    ["Total", list.length, "#3B4453","All"],
-    ["Open", by("Open"), "#B3341C","Open"],
-    ["In Progress", by("In Progress"), "#2E6BC4","In Progress"],
-    ["Waiting for User", by("Waiting for User"), "#6B2E9E","Waiting for User"],
-    ["On Hold", by("On Hold"), "#D99000","On Hold"],
-    ["Resolved", by("Resolved"), "#2E8B4A","Resolved"],
-    ["Closed", by("Closed"), "#3B4453","Closed"],
-    ["High Priority", high, "#7A1023", null],
-    ["Overdue (SLA)", overdue, "#B3341C", null],
-  ];
-  const statusCounts = STATUSES.map(s=>[s,by(s)]).filter(x=>x[1]>0);
-  const catCounts = {};
-  list.forEach(t=>{ const c=t.category||t.module||"Other"; catCounts[c]=(catCounts[c]||0)+1; });
-  const catArr = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const maxCat = Math.max(1,...catArr.map(x=>x[1]));
+  const { cards, statusCounts, catArr, maxCat } = memo("dash:"+timeBucket(), ()=>{
+    const list = myTickets();
+    const by = s=>list.filter(t=>t.status===s).length;
+    const overdue = list.filter(isOverdue).length;
+    const high = list.filter(t=>ACTIVE(t.status)&&(t.priority==="High"||t.priority==="Critical")).length;
+    const cards = [
+      ["Total", list.length, "#3B4453","All"],
+      ["Open", by("Open"), "#B3341C","Open"],
+      ["In Progress", by("In Progress"), "#2E6BC4","In Progress"],
+      ["Waiting for User", by("Waiting for User"), "#6B2E9E","Waiting for User"],
+      ["On Hold", by("On Hold"), "#D99000","On Hold"],
+      ["Resolved", by("Resolved"), "#2E8B4A","Resolved"],
+      ["Closed", by("Closed"), "#3B4453","Closed"],
+      ["High Priority", high, "#7A1023", null],
+      ["Overdue (SLA)", overdue, "#B3341C", null],
+    ];
+    const statusCounts = STATUSES.map(s=>[s,by(s)]).filter(x=>x[1]>0);
+    const catCounts = {};
+    list.forEach(t=>{ const c=t.category||t.module||"Other"; catCounts[c]=(catCounts[c]||0)+1; });
+    const catArr = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const maxCat = Math.max(1,...catArr.map(x=>x[1]));
+    return { cards, statusCounts, catArr, maxCat };
+  });
 
   $("view").innerHTML = `
     <div class="pagetitle">Dashboard ${isStaff()?"":"— your tickets"}</div>
@@ -1037,6 +1081,7 @@ let RPT={range:"30"}; // 7 | 30 | 90 | 365 | all
 function tCreatedDate(t){ return new Date(t.createdAt || (t.created ? t.created+"T09:00:00" : NaN)); }
 function tClosedDate(t){ return new Date(t.resolvedAt || (t.closed ? t.closed+"T17:00:00" : NaN)); }
 function renderReports(){
+  const __R = memo("rpt:"+RPT.range+":"+timeBucket(), ()=>{
   const TK = restrictedConsultant() ? myTickets() : tickets;   // consultants see their own workload only
   const now=new Date();
   const cutoff = RPT.range==="all" ? null : new Date(now - Number(RPT.range)*86400000);
@@ -1126,6 +1171,13 @@ function renderReports(){
     const g=t.approvalGroup||"—"; byApGroup[g]=byApGroup[g]||{p:0,a:0,r:0};
     if(t.approval==="Pending")byApGroup[g].p++; else if(t.approval==="Approved"&&inR(new Date(t.approvalAt||NaN)))byApGroup[g].a++; else if(t.approval==="Rejected"&&inR(new Date(t.approvalAt||NaN)))byApGroup[g].r++;
   });
+  return { created, resolved, activeNow, overdueNow, durs, avgRes, slaOk, highShare,
+           trendSvg, buckets, maxB, priCounts, catArr, depArr, reqArr, maxCat, maxDep,
+           byEng, apPendingAll, apDecided, apAvgH, apRejRate, byApprover, byApGroup };
+  });
+  const { created, resolved, activeNow, overdueNow, durs, avgRes, slaOk, highShare,
+          trendSvg, buckets, maxB, priCounts, catArr, depArr, reqArr, maxCat, maxDep,
+          byEng, apPendingAll, apDecided, apAvgH, apRejRate, byApprover, byApGroup } = __R;
 
   const bar=(label,v,max,color)=>`<div class="barrow"><div class="bl">${esc(label)}</div>
     <div class="bt"><div class="bf" style="width:${Math.round(v/max*100)}%;background:${color||"#2E6BC4"}"></div></div><div class="bv">${v}</div></div>`;
