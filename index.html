@@ -453,7 +453,7 @@ function wireAuthUI(){
     $("lnkMode").textContent = signupMode?"Back to sign in":"Create an account";
   };
   $("lnkReset").onclick = async ()=>{
-    const em = $("aEmail").value.trim();
+    const em = $("aEmail").value.trim().toLowerCase();
     if(!em) return err("Type your email above first, then click reset.");
     try{ await sendPasswordResetEmail(auth, em); err(""); toast("Password reset email sent to "+em); }
     catch(e){ err(niceAuthErr(e)); }
