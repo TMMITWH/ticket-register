@@ -128,6 +128,49 @@
   .barrow .bt{flex:1;background:#EEF1F5;border-radius:5px;height:18px;position:relative}
   .barrow .bf{height:100%;border-radius:5px;background:var(--blue)}
   .barrow .bv{font-family:var(--mono);font-weight:700;width:34px}
+  /* ===== Meeting report ===== */
+  .mrWrap{max-width:900px;margin:0 auto}
+  .mrHead{display:flex;align-items:flex-start;gap:16px;background:var(--dark);color:#fff;border-radius:12px;padding:18px 22px;margin-bottom:14px}
+  .mrHead h1{margin:0;font-size:20px;font-family:var(--disp)}
+  .mrHead .sub{font-size:12px;color:#B7C0CE;margin-top:3px}
+  .mrPct{margin-left:auto;text-align:right}
+  .mrPct b{font-size:38px;font-family:var(--disp);line-height:1}
+  .mrPct span{display:block;font-size:11px;letter-spacing:.12em;color:#9FE0B0;font-weight:700}
+  .mrKpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+  .mrKpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;text-align:center}
+  .mrKpi b{font-size:24px;font-family:var(--disp);display:block}
+  .mrKpi span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+  .mrLine{font-size:12.5px;color:var(--ink2);margin:8px 2px 16px}
+  .mrSec{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:14px;break-inside:avoid}
+  .mrSec h3{margin:0 0 10px;font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut)}
+  .mrBar{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:12.5px}
+  .mrBar .lbl{width:120px;color:var(--ink2)}
+  .mrBar .trk{flex:1;background:#EEF1F5;border-radius:5px;height:14px;overflow:hidden}
+  .mrBar .fill{height:100%;border-radius:5px}
+  .mrBar .val{width:36px;text-align:right;font-family:var(--mono);font-weight:700;font-size:12px}
+  .mrChips{display:flex;gap:8px;flex-wrap:wrap}
+  .mrChip{background:#F2F5F9;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600}
+  .mrChip b{font-family:var(--mono)}
+  table.mrTbl{width:100%;border-collapse:collapse;font-size:12px}
+  table.mrTbl th{background:var(--dark);color:#B7C0CE;text-align:left;padding:7px 9px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+  table.mrTbl td{padding:6px 9px;border-bottom:1px solid #EEF1F5;vertical-align:top}
+  table.mrTbl tr:nth-child(even) td{background:#FAFBFD}
+  .mrAcc{background:#F0F8F1;border:1px solid #CBE5CF;border-radius:10px;padding:12px 16px;font-size:13px;color:#1E5C2E;margin-bottom:14px;break-inside:avoid}
+  .mrNote{width:100%;min-height:56px;border:1px dashed var(--line2);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;background:transparent;color:#1E5C2E;resize:vertical}
+  .mrTrend{display:flex;align-items:flex-end;gap:8px;height:110px;padding-top:6px}
+  .mrTrend .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+  .mrTrend .tbar{width:70%;max-width:44px;background:var(--blue);border-radius:4px 4px 0 0;min-height:2px}
+  .mrTrend .tv{font-family:var(--mono);font-size:11px;font-weight:700}
+  .mrTrend .tl{font-size:9.5px;color:var(--mut);white-space:nowrap}
+  @media print{
+    .topbar,#creditApp,.no-print{display:none!important}
+    body{background:#fff}
+    .main{max-width:100%;padding:0}
+    .mrWrap{max-width:100%}
+    .mrHead{border-radius:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .mrSec,.mrKpi,.mrAcc,table.mrTbl th,.mrBar .fill,.mrTrend .tbar{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .mrNote{border:none;padding:0}
+  }
 </style>
 </head>
 <body>
@@ -548,7 +591,7 @@ function navItems(){
     const n=tickets.filter(t=>t.approval==="Pending" && (isAdmin()||gs.includes(t.approvalGroup))).length;
     items.push(["approvals","Approvals"+(n?` (${n})`:"")]);
   }
-  if(isStaff()) items.push(["reports","Reports"]);
+  if(isStaff()) items.push(["reports","Reports"],["meeting","Meeting Report"]);
   if(isAdmin()) items.push(["admin","Admin"]);
   return items;
 }
@@ -560,6 +603,7 @@ function render(){
   else if(page==="tickets") renderTickets();
   else if(page==="approvals") renderApprovals();
   else if(page==="reports") renderReports();
+  else if(page==="meeting") renderMeeting();
   else if(page==="admin") renderAdmin();
   // don't redraw the drawer while someone is typing a reply
   const ae=document.activeElement, dEl=$("detail");
@@ -1290,6 +1334,149 @@ function trendChart(weeks){
     <rect x="${pad}" y="4" width="10" height="10" rx="2" fill="#2E6BC4"></rect><text x="${pad+15}" y="13" font-size="10" fill="#5B6472">Created</text>
     <rect x="${pad+75}" y="4" width="10" height="10" rx="2" fill="#2E8B4A"></rect><text x="${pad+90}" y="13" font-size="10" fill="#5B6472">Resolved</text>
   </svg>`;
+}
+
+/* ---------- meeting report (IT meeting submission) ---------- */
+function renderMeeting(){
+  const M = memo("meeting:"+timeBucket(), ()=>{
+    const TK = restrictedConsultant() ? myTickets() : tickets;
+    const total = TK.length;
+    const closedList = TK.filter(t=>!ACTIVE(t.status));
+    const closed = closedList.length;
+    const onHold = TK.filter(t=>t.status==="On Hold").length;
+    const openIP = total - closed - onHold;
+    const pct = total ? Math.round(closed/total*100) : 0;
+
+    const pri = {};
+    TK.forEach(t=>{ const p=t.priority||"Medium"; pri[p]=(pri[p]||0)+1; });
+    const priLine = ["Critical","High","Medium","Low"].filter(p=>pri[p])
+      .map(p=>`${pri[p]} ${p}`).join(" \u2022 ");
+
+    const dep = {};
+    TK.forEach(t=>{ const d=t.dept||"Other"; dep[d]=(dep[d]||0)+1; });
+    const depArr = Object.entries(dep).sort((a,b)=>b[1]-a[1]);
+    const maxDep = Math.max(1,...depArr.map(x=>x[1]));
+
+    const openTk = TK.filter(t=>ACTIVE(t.status));
+    const cat = {};
+    openTk.forEach(t=>{ const c=t.category||t.module||"Other"; cat[c]=(cat[c]||0)+1; });
+    const catArr = Object.entries(cat).sort((a,b)=>b[1]-a[1]);
+
+    const stOrder = {"Open":0,"In Progress":1,"Waiting for User":2,"On Hold":3};
+    const rows = [...openTk].sort((a,b)=>
+      (a.category||"").localeCompare(b.category||"") || (stOrder[a.status]??9)-(stOrder[b.status]??9) || a.id-b.id);
+
+    // Weekly created trend — last 8 weeks, Monday-based
+    const now = new Date();
+    const mon = d=>{ const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x; };
+    const w0 = mon(now);
+    const weeks = [];
+    for(let i=7;i>=0;i--){
+      const start = new Date(w0); start.setDate(start.getDate()-i*7);
+      const end = new Date(start); end.setDate(end.getDate()+7);
+      weeks.push({
+        label: start.toLocaleDateString("en-GB",{day:"2-digit",month:"short"}),
+        c: TK.filter(t=>{const d=tCreatedDate(t);return !isNaN(d)&&d>=start&&d<end;}).length
+      });
+    }
+    const maxW = Math.max(1,...weeks.map(w=>w.c));
+
+    // This week: created + % of those already closed
+    const wkCreated = TK.filter(t=>{const d=tCreatedDate(t);return !isNaN(d)&&d>=w0;});
+    const wkClosedPct = wkCreated.length ? Math.round(wkCreated.filter(t=>!ACTIVE(t.status)).length/wkCreated.length*100) : 0;
+
+    return { total, closed, onHold, openIP, pct, priLine, depArr, maxDep, catArr, rows, weeks, maxW,
+             wkCreatedN: wkCreated.length, wkClosedPct };
+  });
+
+  const today = new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+  const note = localStorage.getItem("mrNote") || "";
+  const depColors=["#2E6BC4","#2E8B4A","#D99000","#6B2E9E","#B3341C","#3B4453","#0E8B8B","#7A1023"];
+  const priTag = t => (t.priority==="High"||t.priority==="Critical") ? ` <b style="color:#B3341C">(${esc(t.priority.toUpperCase())} priority)</b>` : "";
+
+  $("view").innerHTML = `
+  <div class="mrWrap">
+    <div class="no-print" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn sm" id="mrCopy">Copy as text</button>
+      <button class="btn sm primary" id="mrPrint">Print / Save PDF</button>
+    </div>
+    <div class="mrHead">
+      <div>
+        <h1>SAP &amp; IT Helpdesk — Closure Overview</h1>
+        <div class="sub">IT Meeting submission &middot; Generated ${esc(today)}</div>
+      </div>
+      <div class="mrPct"><b>${M.pct}%</b><span>CLOSED</span></div>
+    </div>
+    <div class="mrKpis">
+      <div class="mrKpi"><b>${M.closed}</b><span>Closed</span></div>
+      <div class="mrKpi"><b>${M.openIP}</b><span>Open / In Progress${M.onHold?` (+${M.onHold} on hold)`:""}</span></div>
+      <div class="mrKpi"><b>${M.total}</b><span>Total tickets</span></div>
+    </div>
+    <div class="mrLine">Priority mix: ${esc(M.priLine)||"—"} &nbsp;&mdash;&nbsp; this week: ${M.wkCreatedN} created, ${M.wkClosedPct}% weekly closure</div>
+
+    <div class="mrSec">
+      <h3>Tickets by Department</h3>
+      ${M.depArr.map(([d,v],i)=>`<div class="mrBar"><div class="lbl">${esc(d)}</div>
+        <div class="trk"><div class="fill" style="width:${Math.round(v/M.maxDep*100)}%;background:${depColors[i%depColors.length]}"></div></div>
+        <div class="val">${v}</div></div>`).join("")}
+    </div>
+
+    <div class="mrSec">
+      <h3>Open Items by Module / Category</h3>
+      <div class="mrChips">${M.catArr.map(([c,v])=>`<span class="mrChip">${esc(c)} <b>${v}</b></span>`).join("")||"<span class='mrChip'>None — all clear</span>"}</div>
+    </div>
+
+    <div class="mrSec">
+      <h3>Open Tickets — with SAP Consultant / Helpdesk</h3>
+      <table class="mrTbl">
+        <tr><th>ID</th><th>Created</th><th>Raised By</th><th>Dept</th><th>Module</th><th>Subject</th><th>Status</th></tr>
+        ${M.rows.map(t=>`<tr>
+          <td>#${t.id}</td>
+          <td>${esc((tCreatedDate(t)+"")!=="Invalid Date"?tCreatedDate(t).toLocaleDateString("en-GB",{day:"2-digit",month:"short"}):"—")}</td>
+          <td>${esc(t.createdBy||"—")}</td>
+          <td>${esc(t.dept||"—")}</td>
+          <td>${esc(t.category||t.module||"—")}</td>
+          <td>${esc(t.subject||"")}${priTag(t)}</td>
+          <td style="white-space:nowrap;font-weight:700">${esc((t.status||"").toUpperCase())}</td>
+        </tr>`).join("")||`<tr><td colspan="7" style="text-align:center;color:#8A93A3">No open tickets</td></tr>`}
+      </table>
+    </div>
+
+    <div class="mrSec">
+      <h3>Weekly Created Trend (last 8 weeks)</h3>
+      <div class="mrTrend">
+        ${M.weeks.map(w=>`<div class="tb"><div class="tv">${w.c}</div>
+          <div class="tbar" style="height:${Math.max(2,Math.round(w.c/M.maxW*70))}px"></div>
+          <div class="tl">${esc(w.label)}</div></div>`).join("")}
+      </div>
+    </div>
+
+    <div class="mrAcc">
+      <b>&#10004; Key accomplishment:</b>
+      <textarea class="mrNote" id="mrNote" placeholder="Type this week's key accomplishment here — it prints with the report&hellip;">${esc(note)}</textarea>
+    </div>
+  </div>`;
+
+  $("mrPrint").onclick = ()=>window.print();
+  $("mrNote").oninput = e=>localStorage.setItem("mrNote", e.target.value);
+  $("mrCopy").onclick = ()=>{
+    const lines = [
+      "SAP & IT Helpdesk — Closure Overview ("+today+")",
+      M.pct+"% CLOSED — "+M.closed+" closed, "+M.openIP+" open/in progress"+(M.onHold?" (+"+M.onHold+" on hold)":"")+", "+M.total+" total",
+      "Priority mix: "+M.priLine+" — this week: "+M.wkCreatedN+" created, "+M.wkClosedPct+"% weekly closure",
+      "",
+      "Tickets by Department: "+M.depArr.map(([d,v])=>d+" "+v).join(", "),
+      "Open by Module: "+(M.catArr.map(([c,v])=>c+" "+v).join(", ")||"none"),
+      "",
+      "OPEN TICKETS:",
+      ...M.rows.map(t=>"#"+t.id+" | "+(t.createdBy||"-")+" | "+(t.dept||"-")+" | "+(t.category||t.module||"-")+" | "+(t.subject||"")+((t.priority==="High"||t.priority==="Critical")?" ("+t.priority.toUpperCase()+")":"")+" | "+(t.status||"").toUpperCase()),
+      "",
+      "Weekly created trend: "+M.weeks.map(w=>w.c).join(", ")+" (w/c "+M.weeks[0].label+" \u2192 "+M.weeks[M.weeks.length-1].label+")",
+      (localStorage.getItem("mrNote")||"").trim() ? "\u2714 Key accomplishment: "+localStorage.getItem("mrNote").trim() : ""
+    ].filter(Boolean);
+    navigator.clipboard.writeText(lines.join("\n")).then(()=>toast("Report copied — paste into email / Teams"))
+      .catch(()=>toast("Copy failed — use Print instead"));
+  };
 }
 
 /* ---------- admin ---------- */
